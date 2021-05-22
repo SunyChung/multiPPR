@@ -34,7 +34,7 @@ def data_filtering(output_dir, raw_data):
           % (filtered_pd.shape[0], user_activity.shape[0], item_popularity.shape[0], sparsity * 100))
     # after filtering, there are 472443 watching events from 6036 users and 2778 movies (sparsity: 2.818%)
 
-    # filtered_pd = filtered_pd[['userId', 'movieId']]
+    filtered_pd = filtered_pd[['userId', 'movieId']]
     with open(output_dir + 'filtered_ratings.csv', 'w') as f:
         filtered_pd.to_csv(f, index=False)
     return filtered_pd, user_activity, item_popularity
@@ -84,6 +84,9 @@ if __name__ == '__main__':
 
     filtered_pd, user_count, item_count = data_filtering(output_dir, raw_data)
 
+    # unique_uid 는 filtered_pd 로, rating >= 3.5, min_uc = 5, min_sc = 0 으로 걸러진 userId
+    # userId 는 한 번 filtering 되고 나서 train, validation, test 셋으로 나뉘기 때문에
+    # filtered_pd, user_count 로 unique_uid 를 만듬
     unique_uid = user_count.index  # start from 0 !! NOT actual userId
     with open(os.path.join(output_dir, 'unique_uid'), 'wb') as f:
         pickle.dump(unique_uid, f)
@@ -108,6 +111,9 @@ if __name__ == '__main__':
     print('# of validation users : ', len(vd_users))
     print('# of test users : ', len(te_users))
 
+    # unique_sid 를 filtered_pd, tr_users 에서 뽑은 train_plays 로만 지정한 것은,
+    # train 에 포함되지 않는 movieId 는 어차피 validation, test 에도 사용 안 한다는 것
+    # 그러면 multiple PPR 추출할 bipartite matrix 도 train-only movieId 를 써야 하나 ?
     train_plays = filtered_pd.loc[filtered_pd['userId'].isin(tr_users)]
     unique_sid = pd.unique(train_plays['movieId'])
     # print('sorted unique_sid : ', sorted(unique_sid))  # starts from 1 'cause it is pd.unique() array
@@ -116,6 +122,11 @@ if __name__ == '__main__':
 
     movie2id = dict(((sid, i) for (i, sid) in enumerate(unique_sid)))
     user2id = dict(((uid, i) for (i, uid) in enumerate(unique_uid)))
+    with open(os.path.join(output_dir, 'mid_to_midx.dict'), 'wb') as f:
+        pickle.dump(movie2id, f)
+    midx_to_mid = {value: key for (key, value) in movie2id.items()}
+    with open(os.path.join(output_dir, 'midx_to_mid.dict'), 'wb') as f:
+        pickle.dump(midx_to_mid, f)
 
     train_data = numbered(train_plays, movie2id, user2id)
     # print(train_data)
