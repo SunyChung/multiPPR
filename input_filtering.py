@@ -32,7 +32,7 @@ def data_filtering(output_dir, raw_data):
     sparsity = 1. * filtered_pd.shape[0] / (user_activity.shape[0] * item_popularity.shape[0])
     print('after filtering, there are %d watching events from %d users and %d movies (sparsity: %.3f%%)'
           % (filtered_pd.shape[0], user_activity.shape[0], item_popularity.shape[0], sparsity * 100))
-    # after filtering, there are 472443 watching events from 6036 users and 2778 movies (sparsity: 2.818%)
+    # after filtering, there are 574548 watching events from 6031 users and 3533 movies (sparsity: 2.696%)
 
     filtered_pd = filtered_pd[['userId', 'movieId']]
     with open(output_dir + 'filtered_ratings.csv', 'w') as f:
@@ -87,6 +87,8 @@ if __name__ == '__main__':
     # unique_uid 는 filtered_pd 로, rating >= 3.5, min_uc = 5, min_sc = 0 으로 걸러진 userId
     # userId 는 한 번 filtering 되고 나서 train, validation, test 셋으로 나뉘기 때문에
     # filtered_pd, user_count 로 unique_uid 를 만듬
+
+		# 근데, 굳이 number mapping 을 해야 하나 ???
     unique_uidx = user_count.index
     with open(os.path.join(output_dir, 'unique_uidx'), 'wb') as f:
         pickle.dump(unique_uidx, f)
@@ -115,7 +117,10 @@ if __name__ == '__main__':
 
     # unique_sid 를 filtered_pd, tr_users 에서 뽑은 train_plays 로만 지정한 것은,
     # train 에 포함되지 않는 movieId 는 어차피 validation, test 에도 사용 안 한다는 것
-    # 그러면 multiple PPR 추출할 bipartite matrix 도 train-only movieId 를 써야 하나 ?
+    # 그러면 multiple PPR 추출할 bipartite matrix 도 train-only movieId 를 써야 하나 ?  YES !!
+
+		# train 에 포함된 movieId 만 가지고 bipartite -> item matrix 만들어야 
+		# 일종의 cheating 이 안 될 것이라 생각
     '''
     train_plays = filtered_pd.loc[filtered_pd['userId'].isin(tr_users)]
     unique_sid = pd.unique(train_plays['movieId'])
@@ -135,15 +140,13 @@ if __name__ == '__main__':
     with open(output_dir + 'mid_to_midx.dict', 'wb') as f:
         pickle.dump(sid_to_sidx, f)
         
-        
     # train 에 나온 item 만 테스트 하도록 train movieId 만 따로 뽑기 위해 필요한 sidx..
     # 근데, 이 id 도 dictionary mapping 을 해야 
     # global id mapping 된 값들이랑 안 섞일텐데 ??
     train_sidx = pd.unique(train_plays['movieId'])
-    train_mapped = [sid_to_sidx[x] for x in train_sidx]
+    train_mapped_id = [sid_to_sidx[x] for x in train_sidx]
     with open(os.path.join(output_dir, 'train_mapped_id'), 'wb') as f:
-		pickle.dump(train_mapped_id, f)
-
+				pickle.dump(train_mapped_id, f)
     
     '''
     # 여기서 dictionary 의 역할은 0 부터 시작하는 임의의 값으로 바꿔주는 것
