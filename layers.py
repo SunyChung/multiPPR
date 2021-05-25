@@ -127,16 +127,16 @@ if __name__ == '__main__':
 
     start = time.time()
     # the defaul dictionary type is sufficient 'cause the return values already has multi array values !!!
-    per_item_ppr_dict = defaultdict(list)
-    # per_item_ppr_dict = {}
-    per_item_idx_dict = defaultdict(list)
-    # per_item_idx = dict = {}
+    # per_item_ppr_dict = defaultdict(list)
+    per_item_ppr_dict = {}
+    # per_item_idx_dict = defaultdict(list)
+    per_item_idx_dict = {}
     for i in range(movie_mat.shape[0]):
         scores, indices = multi_ppr.multi_contexts(i)
-        per_item_ppr_dict[i].append(scores)
-        # per_item_per_dict[i] = scores
-        per_item_idx_dict[i].append(indices)
-        # per_item_idx_dict[i[ = indices
+        # per_item_ppr_dict[i].append(scores)
+        per_item_ppr_dict[i] = scores
+        # per_item_idx_dict[i].append(indices)
+        per_item_idx_dict[i] = indices
         if i % 10 == 0:
             print('%d nodes processed!' % i)
     end = time.time()
