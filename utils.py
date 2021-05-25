@@ -10,23 +10,25 @@ import torch
 def get_bipartite_matrix(data_dir):
     # "filtered_ratings.csv" 는 아직 index 값으로 mapping 안 된 상태 !!
     df = pd.read_csv(os.path.join(data_dir, 'filtered_ratings.csv'))
-    # user, movie indexing 을 위해 dictionary 읽어오고
+
     with open(os.path.join(data_dir, 'uid_to_uidx.dict'), 'rb') as f:
         uid_to_uidx = pickle.load(f)
     with open(os.path.join(data_dir, 'mid_to_midx.dict'), 'rb') as f:
         mid_to_midx = pickle.load(f)
-    # movieId 의 경우, train dataset 에 포함된 Id 만 선택 !!
     with open(os.path.join(data_dir, 'train_mapped_id'), 'rb') as f:
         train_mapped_id = pickle.load(f)
 
-    row = df['userId'].map(uid_to_uidx)
     col = df['movieId'].map(mid_to_midx)  # Length: 574548,
     col = col.loc[col.isin(train_mapped_id)]  # Length: 574514,
+    row = df['userId'].map(uid_to_uidx) # 574548
+    row = row[col.index]  # Length: 574514
+
     # .map() or .apply(lambda x : )
     # row = df['userId'].apply(lambda x: uid_to_uidx[x])
     # col = df['movieId'].apply(lambda x: mid_to_midx[x])
     data = np.ones(len(row), dtype=int)
-    bi_matrix = csr_matrix((data, (row, col)), shape=(len(uid_to_uidx), len(train_mapped_id)))
+    # careful with the matirx shape !! : max() NOT len() -_
+    bi_matrix = csr_matrix((data, (row, col)), shape=(max(uid_to_uidx), max(train_mapped_id)+1))
     return bi_matrix
 
 
