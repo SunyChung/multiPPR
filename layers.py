@@ -70,28 +70,28 @@ class ContextFeatures(object):
         self.data_dir = data_dir
         self.top_k = top_k
 
-        with open(self.data_dir + 'per_item_idx.dict', 'rb') as f:
+        with open(os.path.join(self.data_dir, 'per_item_idx.dict'), 'rb') as f:
             idx_dict = pickle.load(f)
         self.idx_values = np.array(list(idx_dict.values()))  # np.shape(item_idx) : (3952, 1, 5, 3951)
 
-        with open(self.data_dir + 'per_item_ppr.dict', 'rb') as f:
+        with open(os.path.join(self.data_dir, 'per_item_ppr.dict'), 'rb') as f:
             ppr_dict = pickle.load(f)
         self.ppr_scores = np.array(list(ppr_dict.values()))
 
     def neighbor_embeds(self, target_idx):
-        first_neighbors = torch.Tensor(self.idx_values[target_idx, :, 0, :self.top_k])
-        sec_neighbors = torch.Tensor(self.idx_values[target_idx, :, 1, :self.top_k])
-        third_neighbors = torch.Tensor(self.idx_values[target_idx, :, 2, :self.top_k])
-        four_neighbors = torch.Tensor(self.idx_values[target_idx, :, 3, :self.top_k])
-        fif_neighbors = torch.Tensor(self.idx_values[target_idx, :, 4, :self.top_k])
+        first_neighbors = torch.Tensor(self.idx_values[target_idx, :, 0, :self.top_k]).flatten()
+        sec_neighbors = torch.Tensor(self.idx_values[target_idx, :, 1, :self.top_k]).flatten()
+        third_neighbors = torch.Tensor(self.idx_values[target_idx, :, 2, :self.top_k]).flatten()
+        four_neighbors = torch.Tensor(self.idx_values[target_idx, :, 3, :self.top_k]).flatten()
+        fif_neighbors = torch.Tensor(self.idx_values[target_idx, :, 4, :self.top_k]).flatten()
 
-        first_scores = torch.Tensor(self.ppr_scores[target_idx, :, 0, :self.top_k])
-        sec_scores = torch.Tensor(self.ppr_scores[target_idx, :, 1, :self.top_k])
-        third_scores = torch.Tensor(self.ppr_scores[target_idx, :, 2, :self.top_k])
-        four_scores = torch.Tensor(self.ppr_scores[target_idx, :, 3, :self.top_k])
-        fif_scores = torch.Tensor(self.ppr_scores[target_idx, :, 4, :self.top_k])
-        return [first_neighbors, first_scores, sec_neighbors, sec_scores, third_neighbors, third_scores,
-                four_neighbors, four_scores, fif_neighbors, fif_scores]
+        first_scores = torch.Tensor(self.ppr_scores[target_idx, :, 0, :self.top_k]).flatten()
+        sec_scores = torch.Tensor(self.ppr_scores[target_idx, :, 1, :self.top_k]).flatten()
+        third_scores = torch.Tensor(self.ppr_scores[target_idx, :, 2, :self.top_k]).flatten()
+        four_scores = torch.Tensor(self.ppr_scores[target_idx, :, 3, :self.top_k]).flatten()
+        fif_scores = torch.Tensor(self.ppr_scores[target_idx, :, 4, :self.top_k]).flatten()
+        return [first_neighbors, first_scores, sec_neighbors, sec_scores,
+                third_neighbors, third_scores, four_neighbors, four_scores, fif_neighbors, fif_scores]
 
 
 class ItemLinear(nn.Module):
@@ -99,16 +99,21 @@ class ItemLinear(nn.Module):
         super(ItemLinear, self).__init__()
         self.ln1 = nn.Linear(input_dim, hidden_dim)
         self.ln2 = nn.Linear(hidden_dim, hidden_dim)
-        self.ln3 = nn.Linear(hidden_dim, input_dim)
-        self.final = nn.Linear(input_dim, output_dim)
+        self.ln3 = nn.Linear(hidden_dim, hidden_dim)
+        self.final = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, index, score):
-        x = F.relu(self.ln1(index))
-        x = F.relu(self.ln2(x))
-        x = self.ln3(x)
-        x = torch.mul(x, score)
+        x = F.relu(self.ln1(index))  # 20 -> 200
+        x = F.relu(self.ln2(x))  # 200 -> 200
+        x = self.ln3(x)  # 200 -> 200
+        # print('x length : ', len(x))  # x length :  200
+        # print('score length : ', len(score))  # score length :  20
+        support = score.repeat_interleave(len(x) // len(score))
+        # print(support.shape)  # torch.Size([200])
+        x = torch.mul(x, support)
+        # print(x.shape)  # torch.Size([200])
         x = self.final(x)
-        return x.flatten()
+        return x
 
 
 if __name__ == '__main__':
