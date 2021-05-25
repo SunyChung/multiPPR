@@ -84,11 +84,9 @@ if __name__ == '__main__':
 
     filtered_pd, user_count, item_count = data_filtering(output_dir, raw_data)
 
-    # unique_uid 는 filtered_pd 로, rating >= 3.5, min_uc = 5, min_sc = 0 으로 걸러진 userId
+    # unique_uidx 는 filtered_pd 로, rating >= 3.5, min_uc = 5, min_sc = 0 으로 걸러진 userId
     # userId 는 한 번 filtering 되고 나서 train, validation, test 셋으로 나뉘기 때문에
-    # filtered_pd, user_count 로 unique_uid 를 만듬
-
-		# 근데, 굳이 number mapping 을 해야 하나 ???
+    # filtered_pd, user_count 로 unique_uidx 를 만듬
     unique_uidx = user_count.index
     with open(os.path.join(output_dir, 'unique_uidx'), 'wb') as f:
         pickle.dump(unique_uidx, f)
@@ -100,7 +98,6 @@ if __name__ == '__main__':
     uid_to_uidx = {value: key for (key, value) in uidx_to_uid.items()}
     with open(output_dir + 'uid_to_uidx.dict', 'wb') as f:
         pickle.dump(uid_to_uidx, f)
-    
 
     np.random.seed(1234)
     idx_perm = np.random.permutation(unique_uidx.size)
@@ -118,19 +115,15 @@ if __name__ == '__main__':
     # unique_sid 를 filtered_pd, tr_users 에서 뽑은 train_plays 로만 지정한 것은,
     # train 에 포함되지 않는 movieId 는 어차피 validation, test 에도 사용 안 한다는 것
     # 그러면 multiple PPR 추출할 bipartite matrix 도 train-only movieId 를 써야 하나 ?  YES !!
-
-		# train 에 포함된 movieId 만 가지고 bipartite -> item matrix 만들어야 
-		# 일종의 cheating 이 안 될 것이라 생각
-    '''
-    train_plays = filtered_pd.loc[filtered_pd['userId'].isin(tr_users)]
-    unique_sid = pd.unique(train_plays['movieId'])
-    # print('sorted unique_sid : ', sorted(unique_sid))  # starts from 1 'cause it is pd.unique() array
-    with open(os.path.join(output_dir, 'unique_sid'), 'wb') as f:
-        pickle.dump(unique_sid, f)
-    '''
+    #
+    # 		# train 에 포함된 movieId 만 가지고 bipartite -> item matrix 만들어야
+    # 		# 일종의 cheating 이 안 될 것이라 생각
+    # train set 에 포함되지 않은 전체 item index 값도 가지고 있을 것
+    # validation, test set 에는 train data 에 있는 item 만 넣는다고 하더라도
+    # 나중에 전체 graph ID 찾으려면 전체 item dictionary 가 필요함 !!
     unique_sidx = item_count.index
     with open(os.path.join(output_dir, 'unique_sidx'), 'wb') as f:
-    pickle.dump(unique_sidx, f)
+        pickle.dump(unique_sidx, f)
 
     sidx_to_sid = item_count['movieId'].to_dict()
     with open(output_dir + 'midx_to_mid.dict', 'wb') as f:
@@ -139,58 +132,34 @@ if __name__ == '__main__':
     sid_to_sidx = {value: key for (key, value) in sidx_to_sid.items()}
     with open(output_dir + 'mid_to_midx.dict', 'wb') as f:
         pickle.dump(sid_to_sidx, f)
-        
-    # train 에 나온 item 만 테스트 하도록 train movieId 만 따로 뽑기 위해 필요한 sidx..
-    # 근데, 이 id 도 dictionary mapping 을 해야 
-    # global id mapping 된 값들이랑 안 섞일텐데 ??
+
+    train_plays = filtered_pd.loc[filtered_pd['userId'].isin(tr_users)]
+    # train_data = numbered(train_plays, movie2id, user2id)
+    train_data = numbered(train_plays, sid_to_sidx, uid_to_uidx)
+    train_data.to_csv(os.path.join(output_dir, 'train.csv'), index=False)
+
     train_sidx = pd.unique(train_plays['movieId'])
     train_mapped_id = [sid_to_sidx[x] for x in train_sidx]
     with open(os.path.join(output_dir, 'train_mapped_id'), 'wb') as f:
-				pickle.dump(train_mapped_id, f)
-    
-    '''
-    # 여기서 dictionary 의 역할은 0 부터 시작하는 임의의 값으로 바꿔주는 것
-    # 근데, 이미 숫자인 값들을 굳이 다시 mapping 해야 하나 ?!
-    # 어차피 전체 id 다 쓸 거면, 나는 굳이 mapping 안 해도 될 듯 ......
-    movie2id = dict(((sid, i) for (i, sid) in enumerate(unique_sid)))
-    user2id = dict(((uid, i) for (i, uid) in enumerate(unique_uid)))
-    with open(os.path.join(output_dir, 'mid_to_midx.dict'), 'wb') as f:
-        pickle.dump(movie2id, f)
-    midx_to_mid = {value: key for (key, value) in movie2id.items()}
-    with open(os.path.join(output_dir, 'midx_to_mid.dict'), 'wb') as f:
-        pickle.dump(midx_to_mid, f)
-    '''
-    
-    train_data = numbered(train_plays, sid_to_sidx, uid_to_uidx)
-    # train_data = numbered(train_plays, movie2id, user2id)
-    # print(train_data)
-    train_data.to_csv(os.path.join(output_dir, 'train.csv'), index=False)
+        pickle.dump(train_mapped_id, f)
 
     vad_plays = filtered_pd.loc[filtered_pd['userId'].isin(vd_users)]
-    # train 된 item index 만 쓸 것인가 ?
-    # vad_plays = vad_plays.loc[vad_plays['movieId'].isin(unique_sidx)]
+    # vad_plays = vad_plays.loc[vad_plays['movieId'].isin(unique_sid)]
     vad_plays = vad_plays.loc[vad_plays['movieId'].isin(train_mapped_id)]
     vad_plays_tr, vad_plays_te = split_train_test_proportion(vad_plays, test_prop)
-    
     vad_data_tr = numbered(vad_plays_tr, sid_to_sidx, uid_to_uidx)
     vad_data_te = numbered(vad_plays_tr, sid_to_sidx, uid_to_uidx)
-    # vad_data_tr = numbered(vad_plays_tr, movie2id, user2id)
-    # vad_data_te = numbered(vad_plays_tr, movie2id, user2id)
     # print(vad_data_tr)
     # print(vad_data_te)
     vad_data_tr.to_csv(os.path.join(output_dir, 'vad_tr.csv'), index=False)
     vad_data_te.to_csv(os.path.join(output_dir, 'vad_te.csv'), index=False)
 
     test_plays = filtered_pd.loc[filtered_pd['userId'].isin(te_users)]
-    # 여기도 마찬가지 ! train 된 item index 만 쓸 것인가 ?
-    # test_plays = test_plays.loc[test_plays['movieId'].isin(unique_sidx)]
+    # test_plays = test_plays.loc[test_plays['movieId'].isin(unique_sid)]
     test_plays = test_plays.loc[test_plays['movieId'].isin(train_mapped_id)]
     test_plays_tr, test_plays_te = split_train_test_proportion(test_plays, test_prop)
-
     test_data_tr = numbered(test_plays_tr, sid_to_sidx, uid_to_uidx)
     test_data_te = numbered(test_plays_te, sid_to_sidx, uid_to_uidx)
-    #test_data_tr = numbered(test_plays_tr, movie2id, user2id)
-    #test_data_te = numbered(test_plays_te, movie2id, user2id)
     # print(test_data_tr)
     # print(test_data_te)
     test_data_tr.to_csv(os.path.join(output_dir, 'test_tr.csv'), index=False)
