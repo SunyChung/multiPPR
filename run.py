@@ -68,7 +68,7 @@ def train(epoch, train_coords, train_values):
         # print(user_idxs.shape)  # (100,)
         # print(item_idxs.shape)  # (100,)
         print('item_idxs ', item_idxs)
-        predictions = model(user_idxs.to(device), item_idxs.to(device))
+        predictions = model(torch.Tensor(user_idxs).to(device), torch.Tensor(item_idxs).to(device))
         print('predictions : ', predictions)
         # [tensor([0.5097], grad_fn=<SigmoidBackward>), tensor([0.5104], grad_fn=<SigmoidBackward>),
         # tensor([0.5083], grad_fn=<SigmoidBackward>), tensor([0.5086], grad_fn=<SigmoidBackward>), ... ]
@@ -97,7 +97,7 @@ def test():
     for i in range(test_n):
         user_idx = test_coords[i, 0]
         item_idx = test_coords[i, 1]
-        prediction = model(user_idx.to(device), item_idx.to(device))
+        prediction = model(torch.Tensor(user_idx).to(device), torch.Tensor(item_idx).to(device))
         target = torch.Tensor([test_values[i]])
         test_loss = loss(prediction, target)
         loss_list.append(test_loss)
