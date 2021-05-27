@@ -31,7 +31,12 @@ output_dim = args.output_dim
 
 n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te = load_data(data_dir)
 
-model = ContextualizedNN(data_dir, input_dim, hidden_dim, output_dim, top_k)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print('Using {} device'.format(device))
+model = ContextualizedNN(data_dir, input_dim, hidden_dim, output_dim, top_k).to(device)
+print(model)
+pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
@@ -51,13 +56,18 @@ def train(epoch, train_coords, train_values):
     loss = nn.BCELoss()
     loss_list = []
     # print('train_n : ', train_n)  # 480722
-    for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
+    # for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
+    for batch_num, st_idx in enumerate(range(0, 110, batch_size)):
         print('batch num : ', batch_num)
-        end_idx = min(st_idx + batch_size, train_n)
+        print('st_idx : ', st_idx)
+        end_idx = min(st_idx + batch_size, 110)
+        # end_idx = min(st_idx + batch_size, train_n)
+        print('end_idx : ', end_idx)
         user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
         item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
         # print(user_idxs.shape)  # (100,)
         # print(item_idxs.shape)  # (100,)
+        print('item_idxs ', item_idxs)
         predictions = model(user_idxs, item_idxs)
         print('predictions : ', predictions)
         # [tensor([0.5097], grad_fn=<SigmoidBackward>), tensor([0.5104], grad_fn=<SigmoidBackward>),
@@ -65,11 +75,12 @@ def train(epoch, train_coords, train_values):
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
         print('targets : ', targets)
         train_loss = loss(predictions, targets)
-        loss_list.append(train_loss)
+        loss_list.append(train_loss.detach().numpy())
         # print(train_loss)
         train_loss.backward()
         optimizer.step()
 
+    print(loss_list)
     print('epoch : {:04d}'.format(epoch),
           'train_loss : {:.4f}'.format(np.mean(loss_list)),
           'time : {:.4f}s'.format(time.time() - start))
