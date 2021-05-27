@@ -79,6 +79,9 @@ class ContextFeatures(object):
         self.ppr_scores = np.array(list(ppr_dict.values()))
 
     def neighbor_embeds(self, target_idx):
+        # target_idx 를 여러 개 list 로 넘기면, 각 id 별로 factor 를 읽어서 합친 다음 반환함
+        # ex. idx = [1, 3, 5, 16] 의 4 개 id 를 넘기면
+        # 1st factor 4 개가 concatenate 되서 20 x 4 = 80 length 로 반환
         first_neighbors = torch.Tensor(self.idx_values[target_idx, :, 0, :self.top_k]).flatten()
         sec_neighbors = torch.Tensor(self.idx_values[target_idx, :, 1, :self.top_k]).flatten()
         third_neighbors = torch.Tensor(self.idx_values[target_idx, :, 2, :self.top_k]).flatten()
@@ -127,15 +130,11 @@ if __name__ == '__main__':
 
     start = time.time()
     # the defaul dictionary type is sufficient 'cause the return values already has multi array values !!!
-    # per_item_ppr_dict = defaultdict(list)
     per_item_ppr_dict = {}
-    # per_item_idx_dict = defaultdict(list)
     per_item_idx_dict = {}
     for i in range(movie_mat.shape[0]):
         scores, indices = multi_ppr.multi_contexts(i)
-        # per_item_ppr_dict[i].append(scores)
         per_item_ppr_dict[i] = scores
-        # per_item_idx_dict[i].append(indices)
         per_item_idx_dict[i] = indices
         if i % 10 == 0:
             print('%d nodes processed!' % i)
