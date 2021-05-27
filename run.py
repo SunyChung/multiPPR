@@ -104,7 +104,7 @@ def test():
     return loss_list
 
 
-test_coords.to(device), test_values.to(device), _ = get_sparse_coord_value_shape(test_data_tr)
+test_coords, test_values, _ = get_sparse_coord_value_shape(test_data_tr)
 test_n = len(test_coords)
 
 loss_list = test()
