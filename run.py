@@ -32,14 +32,14 @@ output_dim = args.output_dim
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using {} device'.format(device))
 
-n_items.to(device), train_data.to(device), vad_data_tr.to(device), vad_data_te.to(device), test_data_tr.to(device), test_data_te.to(device) = load_data(data_dir)
+n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te = load_data(data_dir)
 model = ContextualizedNN(data_dir, input_dim, hidden_dim, output_dim, top_k).to(device)
 print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
+train_coords.to(device), train_values.to(device), _ = get_sparse_coord_value_shape(train_data)
 # print(train_coords)
 # print(train_coords.shape)  # (480722, 2)
 # print(train_values)
@@ -104,7 +104,7 @@ def test():
     return loss_list
 
 
-test_coords, test_values, _ = get_sparse_coord_value_shape(test_data_tr)
+test_coords.to(device), test_values.to(device), _ = get_sparse_coord_value_shape(test_data_tr)
 test_n = len(test_coords)
 
 loss_list = test()
