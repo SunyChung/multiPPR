@@ -39,7 +39,7 @@ pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_g
 print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-train_coords.to(device), train_values.to(device), _ = get_sparse_coord_value_shape(train_data)
+train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
 # print(train_coords)
 # print(train_coords.shape)  # (480722, 2)
 # print(train_values)
@@ -63,8 +63,8 @@ def train(epoch, train_coords, train_values):
         end_idx = min(st_idx + batch_size, 110)
         # end_idx = min(st_idx + batch_size, train_n)
         print('end_idx : ', end_idx)
-        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
-        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
+        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0].to(device)
+        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1].to(device)
         # print(user_idxs.shape)  # (100,)
         # print(item_idxs.shape)  # (100,)
         print('item_idxs ', item_idxs)
@@ -72,7 +72,7 @@ def train(epoch, train_coords, train_values):
         print('predictions : ', predictions)
         # [tensor([0.5097], grad_fn=<SigmoidBackward>), tensor([0.5104], grad_fn=<SigmoidBackward>),
         # tensor([0.5083], grad_fn=<SigmoidBackward>), tensor([0.5086], grad_fn=<SigmoidBackward>), ... ]
-        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
+        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
         print('targets : ', targets)
         train_loss = loss(predictions, targets)
         loss_list.append(train_loss.detach().numpy())
@@ -95,10 +95,10 @@ def test():
     loss = nn.BCELoss()
     loss_list = []
     for i in range(test_n):
-        user_idx = test_coords[i, 0]
-        item_idx = test_coords[i, 1]
+        user_idx = test_coords[i, 0].to(device)
+        item_idx = test_coords[i, 1].to(device)
         prediction = model(user_idx, item_idx)
-        target = torch.Tensor([test_values[i]])
+        target = torch.Tensor([test_values[i]]).to(device)
         test_loss = loss(prediction, target)
         loss_list.append(test_loss)
     return loss_list
