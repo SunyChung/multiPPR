@@ -1,3 +1,5 @@
+import torch
+
 from layers import *
 from utils import get_user_sequences
 
@@ -9,6 +11,7 @@ class ContextualizedNN(nn.Module):
         with open(os.path.join(data_dir, 'per_user_item.dict'), 'rb') as f:
             self.per_user_item_dict = pickle.load(f)
 
+        self.top_k = top_k
         self.com_1 = ItemLinear(input_dim, hidden_dim, output_dim)
         self.com_2 = ItemLinear(input_dim, hidden_dim, output_dim)
         self.com_3 = ItemLinear(input_dim, hidden_dim, output_dim)
@@ -19,39 +22,48 @@ class ContextualizedNN(nn.Module):
         self.CFs = ContextFeatures(data_dir, top_k)
 
     def forward(self, user_idxs, item_idxs):
-        feature_list = self.CFs.neighbor_embeds(target_idx=item_idxs)
-        # ('feature_list len : ', len(feature_list))
-        # print('feature_list[0] : ', feature_list[0])
-        # tensor([1195.,  259., 2857., 1197., 2570.,  592., 2027.,  317., 1269., 2761.,
-        # 1196., 1209., 1264.,  526.,  588.,  607., 2395., 3113.,  295.,  109.])
-        # print('feature_list[0] type : ', type(feature_list))  #  <class 'list'>
-        # print('feature_list[0][0] : ', feature_list[0][0])  # tensor(1195.)
-
-        item_rep = torch.cat((self.com_1(feature_list[0], feature_list[1]),
-                              self.com_2(feature_list[2], feature_list[3]),
-                              self.com_3(feature_list[4], feature_list[5]),
-                              self.com_4(feature_list[6], feature_list[7]),
-                              self.com_5(feature_list[8], feature_list[9])
-        ))
-
-        per_user_items = self.per_user_item_dict[user_idxs]
-        item_list = []
-        for i in per_user_items:
-            feat = self.CFs.neighbor_embeds(target_idx=i)
-            item = torch.cat((self.com_1(feat[0], feat[1]),
-                              self.com_2(feat[2], feat[3]),
-                              self.com_3(feat[4], feat[5]),
-                              self.com_4(feat[6], feat[7]),
-                              self.com_5(feat[8], feat[9])
-            ))
-            item_list.append(item)
-        user_rep = torch.mean(torch.stack(item_list), dim=0)
-        # print('user_rep size : ', user_rep.shape)  # user_rep size :  torch.Size([50])
-        # print('item_rep size : ', item_rep.shape) # item_rep size :  torch.Size([50]) = 10 x 5
-        interaction = user_rep * item_rep
-        # print('interaction size : ', interaction.shape)  # interaction size :  torch.Size([50])
-        prediction = self.interact_linear(interaction)
-        return torch.sigmoid(prediction)
+        item_feature = self.CFs.neighbor_embeds(item_idxs)
+        item_rep_list = []
+        for i in range(len(item_idxs)):
+            item_rep = torch.cat((self.com_1(item_feature[0][self.top_k * i:self.top_k * (i+1)],
+                                             item_feature[1][self.top_k * i:self.top_k * (i+1)]),
+                                  self.com_2(item_feature[2][self.top_k * i:self.top_k * (i+1)],
+                                             item_feature[3][self.top_k * i:self.top_k * (i+1)]),
+                                  self.com_3(item_feature[4][self.top_k * i:self.top_k * (i+1)],
+                                             item_feature[5][self.top_k * i:self.top_k * (i+1)]),
+                                  self.com_4(item_feature[6][self.top_k * i:self.top_k * (i+1)],
+                                             item_feature[7][self.top_k * i:self.top_k * (i+1)]),
+                                  self.com_5(item_feature[8][self.top_k * i:self.top_k * (i+1)],
+                                             item_feature[9][self.top_k * i:self.top_k * (i+1)])
+                                  ))
+            item_rep_list.append(item_rep)
+        # 여기서는 user_idx 가 복수이기 때문에, 먼저, user 별 item list 만들고,
+        # 각각의 item list 를 위에서 처럼 합쳐서 user representation 만들어야 함
+        batch_user_item_list = [self.per_user_item_dict[i] for i in user_idxs]
+        batch_user_item_rep = []
+        for i in range(len(batch_user_item_list)):
+            per_user_item_rep = []
+            per_user_item_features = self.CFs.neighbor_embeds(batch_user_item_list[i])
+            for j in range(len(batch_user_item_list[i])):
+                item_rep =  torch.cat((
+                        self.com_1(per_user_item_features[0][self.top_k * j:self.top_k * (j + 1)],
+                                   per_user_item_features[1][self.top_k * j:self.top_k * (j + 1)]),
+                        self.com_2(per_user_item_features[2][self.top_k * j:self.top_k * (j + 1)],
+                                   per_user_item_features[3][self.top_k * j:self.top_k * (j + 1)]),
+                        self.com_3(per_user_item_features[4][self.top_k * j:self.top_k * (j + 1)],
+                                   per_user_item_features[5][self.top_k * j:self.top_k * (j + 1)]),
+                        self.com_4(per_user_item_features[6][self.top_k * j:self.top_k * (j + 1)],
+                                   per_user_item_features[7][self.top_k * j:self.top_k * (j + 1)]),
+                        self.com_5(per_user_item_features[8][self.top_k * j:self.top_k * (j + 1)],
+                                   per_user_item_features[9][self.top_k * j:self.top_k * (j + 1)])
+                    ))
+                per_user_item_rep.append(item_rep)
+            batch_user_item_rep.append(torch.mean(torch.stack(per_user_item_rep), dim=0))
+        # 왜 길이랑 type 이 동일한데 interaction type 이 object 인지 ?!
+        # 근데, 이렇게 무식하게 list 써도 되는 건가 -_ ;;;
+        interaction_list = [batch_user_item_rep[i] * item_rep_list[i] for i in range(len(batch_user_item_rep))]
+        batch_prediction = [self.interact_linear(interaction_list[i]) for i in range(len(interaction_list))]
+        return torch.cat([torch.sigmoid(batch_prediction[i]) for i in range(len(batch_prediction))])
 
 
 if __name__ == '__main__':
@@ -59,9 +71,3 @@ if __name__ == '__main__':
     _, per_user_item_dict = get_user_sequences(data_dir)
     with open(data_dir + 'per_user_item.dict', 'wb') as f:
         pickle.dump(per_user_item_dict, f)
-
-    top_k = 20
-    input_dim = top_k
-    hidden_dim = 40
-    output_dim = 10
-
