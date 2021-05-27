@@ -14,15 +14,11 @@ def get_count(tp, id):
 def filter_triplets(tp, min_sc=0, min_uc=5):
     if min_sc > 0:
         item_count = get_count(tp, 'movieId')
-        # for python 3.7 or less, groupby.size() DO NOT return the 'size' column name !
-        # why do they make this irritating change -_;
-        # tp = tp[tp['movieId'].isin(item_count.index[item_count >= min_sc])]
         tp = tp[tp['movieId'].isin(item_count.index[item_count['size'] >= min_sc])]
         print('movieId filtered !')
 
     if min_uc > 0:
         user_count = get_count(tp, 'userId')
-        # tp = tp[tp['userId'].isin(user_count.index[user_count >= min_uc])]
         tp = tp[tp['userId'].isin(user_count.index[user_count['size'] >= min_uc])]
         print('userId filtered!')
 
