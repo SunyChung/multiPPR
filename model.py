@@ -64,10 +64,3 @@ class ContextualizedNN(nn.Module):
         interaction_list = [batch_user_item_rep[i] * item_rep_list[i] for i in range(len(batch_user_item_rep))]
         batch_prediction = [self.interact_linear(interaction_list[i]) for i in range(len(interaction_list))]
         return torch.cat([torch.sigmoid(batch_prediction[i]) for i in range(len(batch_prediction))])
-
-
-if __name__ == '__main__':
-    data_dir = './data/ml-1m/'
-    _, per_user_item_dict = get_user_sequences(data_dir)
-    with open(data_dir + 'per_user_item.dict', 'wb') as f:
-        pickle.dump(per_user_item_dict, f)
