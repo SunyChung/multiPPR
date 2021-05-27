@@ -32,7 +32,7 @@ output_dim = args.output_dim
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using {} device'.format(device))
 
-n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te = load_data(data_dir).to(device)
+n_items.to(device), train_data.to(device), vad_data_tr.to(device), vad_data_te.to(device), test_data_tr.to(device), test_data_te.to(device) = load_data(data_dir)
 model = ContextualizedNN(data_dir, input_dim, hidden_dim, output_dim, top_k).to(device)
 print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
