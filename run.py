@@ -63,16 +63,16 @@ def train(epoch, train_coords, train_values):
         end_idx = min(st_idx + batch_size, 110)
         # end_idx = min(st_idx + batch_size, train_n)
         print('end_idx : ', end_idx)
-        user_idxs = torch.Tensor(train_coords[idxlist[st_idx:end_idx]][:, 0]).to(device)
-        item_idxs = torch.Tensor(train_coords[idxlist[st_idx:end_idx]][:, 1]).to(device)
+        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
+        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
         # print(user_idxs.shape)  # (100,)
         # print(item_idxs.shape)  # (100,)
         print('item_idxs ', item_idxs)
-        predictions = model(user_idxs, item_idxs)
+        predictions = model(user_idxs.to(device), item_idxs.to(device))
         print('predictions : ', predictions)
         # [tensor([0.5097], grad_fn=<SigmoidBackward>), tensor([0.5104], grad_fn=<SigmoidBackward>),
         # tensor([0.5083], grad_fn=<SigmoidBackward>), tensor([0.5086], grad_fn=<SigmoidBackward>), ... ]
-        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
+        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
         print('targets : ', targets)
         train_loss = loss(predictions, targets)
         loss_list.append(train_loss.detach().numpy())
@@ -95,10 +95,10 @@ def test():
     loss = nn.BCELoss()
     loss_list = []
     for i in range(test_n):
-        user_idx = torch.Tensor(test_coords[i, 0]).to(device)
-        item_idx = torch.Tensor(test_coords[i, 1]).to(device)
-        prediction = model(user_idx, item_idx)
-        target = torch.Tensor([test_values[i]]).to(device)
+        user_idx = test_coords[i, 0]
+        item_idx = test_coords[i, 1]
+        prediction = model(user_idx.to(device), item_idx.to(device))
+        target = torch.Tensor([test_values[i]])
         test_loss = loss(prediction, target)
         loss_list.append(test_loss)
     return loss_list
