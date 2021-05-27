@@ -72,7 +72,8 @@ class ContextFeatures(object):
 
         with open(os.path.join(self.data_dir, 'per_item_idx.dict'), 'rb') as f:
             idx_dict = pickle.load(f)
-        self.idx_values = np.array(list(idx_dict.values()))  # np.shape(item_idx) : (3952, 1, 5, 3951)
+        self.idx_values = np.array(list(idx_dict.values()))
+        # np.shape(item_idx) : (3952, 1, 5, 3951) -> (3952, 5, 3951) with dictionary format change
 
         with open(os.path.join(self.data_dir, 'per_item_ppr.dict'), 'rb') as f:
             ppr_dict = pickle.load(f)
@@ -82,17 +83,17 @@ class ContextFeatures(object):
         # target_idx 를 여러 개 list 로 넘기면, 각 id 별로 factor 를 읽어서 합친 다음 반환함
         # ex. idx = [1, 3, 5, 16] 의 4 개 id 를 넘기면
         # 1st factor 4 개가 concatenate 되서 20 x 4 = 80 length 로 반환
-        first_neighbors = torch.Tensor(self.idx_values[target_idx, :, 0, :self.top_k]).flatten()
-        sec_neighbors = torch.Tensor(self.idx_values[target_idx, :, 1, :self.top_k]).flatten()
-        third_neighbors = torch.Tensor(self.idx_values[target_idx, :, 2, :self.top_k]).flatten()
-        four_neighbors = torch.Tensor(self.idx_values[target_idx, :, 3, :self.top_k]).flatten()
-        fif_neighbors = torch.Tensor(self.idx_values[target_idx, :, 4, :self.top_k]).flatten()
+        first_neighbors = torch.Tensor(self.idx_values[target_idx, 0, :self.top_k]).flatten()
+        sec_neighbors = torch.Tensor(self.idx_values[target_idx, 1, :self.top_k]).flatten()
+        third_neighbors = torch.Tensor(self.idx_values[target_idx, 2, :self.top_k]).flatten()
+        four_neighbors = torch.Tensor(self.idx_values[target_idx, 3, :self.top_k]).flatten()
+        fif_neighbors = torch.Tensor(self.idx_values[target_idx, 4, :self.top_k]).flatten()
 
-        first_scores = torch.Tensor(self.ppr_scores[target_idx, :, 0, :self.top_k]).flatten()
-        sec_scores = torch.Tensor(self.ppr_scores[target_idx, :, 1, :self.top_k]).flatten()
-        third_scores = torch.Tensor(self.ppr_scores[target_idx, :, 2, :self.top_k]).flatten()
-        four_scores = torch.Tensor(self.ppr_scores[target_idx, :, 3, :self.top_k]).flatten()
-        fif_scores = torch.Tensor(self.ppr_scores[target_idx, :, 4, :self.top_k]).flatten()
+        first_scores = torch.Tensor(self.ppr_scores[target_idx, 0, :self.top_k]).flatten()
+        sec_scores = torch.Tensor(self.ppr_scores[target_idx, 1, :self.top_k]).flatten()
+        third_scores = torch.Tensor(self.ppr_scores[target_idx, 2, :self.top_k]).flatten()
+        four_scores = torch.Tensor(self.ppr_scores[target_idx, 3, :self.top_k]).flatten()
+        fif_scores = torch.Tensor(self.ppr_scores[target_idx, 4, :self.top_k]).flatten()
         return [first_neighbors, first_scores, sec_neighbors, sec_scores,
                 third_neighbors, third_scores, four_neighbors, four_scores, fif_neighbors, fif_scores]
 
