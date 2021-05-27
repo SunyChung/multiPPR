@@ -116,3 +116,10 @@ def get_sparse_coord_value_shape(sparse_mat):
     values = sparse_mat.data
     shape = sparse_mat.shape
     return coords, values, shape
+
+
+if __name__ == '__main__':
+    data_dir = './data/ml-1m/'
+    _, per_user_item_dict = get_user_sequences(data_dir)
+    with open(data_dir + 'per_user_item.dict', 'wb') as f:
+        pickle.dump(per_user_item_dict, f)
