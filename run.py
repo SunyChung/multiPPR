@@ -48,6 +48,14 @@ train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
 # print(train_coords.shape)  # (480722, 2)
 # print(train_values)
 
+if device == 'cuda':
+    train_data = train_data.cuda()
+    vad_data_tr = vad_data_tr.cuda()
+    vad_data_te = vad_data_te.cuda()
+    test_data_tr = test_data_tr.cuda()
+    test_data_te = test_data_te.cuda()
+    model = model.cuda()
+
 
 def train(epoch, train_coords, train_values):
     train_n = len(train_coords)
@@ -85,6 +93,8 @@ for epoch in range(epochs):
 
 
 print('test started !')
+
+
 def test(test_coords, test_values):
     test_n = len(test_coords)
     idxlist = list(range(test_n))
