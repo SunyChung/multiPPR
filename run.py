@@ -64,8 +64,8 @@ def train(epoch, train_coords, train_values):
         print('batch num : ', batch_num)
         end_idx = min(st_idx + batch_size, 110)
         # end_idx = min(st_idx + batch_size, train_n)
-        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0].to(device)
-        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1].to(device)
+        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
+        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
         predictions = model(user_idxs, item_idxs)
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
         # print('targets shape: ', targets.shape)  # torch.Size([100]) = batch_size
@@ -95,8 +95,8 @@ def test(test_coords, test_values):
     loss_list = []
     for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
         end_idx = min(st_idx+batch_size, test_n)
-        user_idx = test_coords[idxlist[st_idx:end_idx]][:, 0].to(device)
-        item_idx = test_coords[idxlist[st_idx:end_idx]][:, 1].to(device)
+        user_idx = test_coords[idxlist[st_idx:end_idx]][:, 0]
+        item_idx = test_coords[idxlist[st_idx:end_idx]][:, 1]
         prediction = model(user_idx, item_idx)
         targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]]).to(device)
         test_loss = loss(prediction, targets)
