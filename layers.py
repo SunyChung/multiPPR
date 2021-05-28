@@ -93,32 +93,19 @@ class MultiPPR(object):
 class ItemLinear(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(ItemLinear, self).__init__()
-        self.ln1 = nn.Linear(input_dim, hidden_dim)
+        self.ln1 = nn.Linear(input_dim, hidden_dim)  # when hidden = input * 100 = 2000
         self.ln2 = nn.Linear(hidden_dim, hidden_dim)
         self.ln3 = nn.Linear(hidden_dim, hidden_dim)
         self.final = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, index, score):
-        # print('index : ', index.shape)  # torch.Size([20, 1])
-        # print('score : ', score.shape)  # torch.Size([20, 1])
+        # print('index : ', index.shape)  # torch.Size([20])
+        # print('score : ', score.shape)  # torch.Size([20])
         x = self.ln1(index)
         x = self.ln2(x)
-        x = self.ln3(x)  # torch.Size([20, 100])
-
-        # x.shape[1] = 100 , score.shape[1] = 1
-        support = score.repeat_interleave(x.shape[1] // score.shape[1], axis=1)
-        # print('support shape : ', support.shape)  # torch.Size([20, 100])
-        # print('support : ', support)
-        # support :  tensor([[0.0011, 0.0011, 0.0011,  ..., 0.0011, 0.0011, 0.0011],
-        #         [0.0011, 0.0011, 0.0011,  ..., 0.0011, 0.0011, 0.0011],
-        #         [0.0010, 0.0010, 0.0010,  ..., 0.0010, 0.0010, 0.0010],
-        #         ...,
-        #         [0.0008, 0.0008, 0.0008,  ..., 0.0008, 0.0008, 0.0008],
-        #         [0.0008, 0.0008, 0.0008,  ..., 0.0008, 0.0008, 0.0008],
-        #         [0.0008, 0.0008, 0.0008,  ..., 0.0008, 0.0008, 0.0008]])
-        # x 와 support 순서 바뀌어도 상관없음 !
+        x = self.ln3(x)  # torch.Size([2000])
+        support = score.repeat_interleave(x.shape[0] // score.shape[0])
         x = torch.mul(x, support)
-        # x = torch.mul(support, x)
         x = self.final(x)
         return x
 
