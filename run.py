@@ -49,12 +49,12 @@ train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
 # print(train_values)
 
 if device == 'cuda':
-    train_data = train_data.cuda()
-    vad_data_tr = vad_data_tr.cuda()
-    vad_data_te = vad_data_te.cuda()
-    test_data_tr = test_data_tr.cuda()
-    test_data_te = test_data_te.cuda()
-    model = model.cuda()
+    train_data = train_data.to(device)
+    vad_data_tr = vad_data_tr.to(device)
+    vad_data_te = vad_data_te.to(device)
+    test_data_tr = test_data_tr.to(device)
+    test_data_te = test_data_te.to(device)
+    model = model.to(device)
 
 
 def train(epoch, train_coords, train_values):
