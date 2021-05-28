@@ -48,7 +48,7 @@ train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
 # print(train_coords.shape)  # (480722, 2)
 # print(train_values)
 
-'''
+
 def train(epoch, train_coords, train_values):
     train_n = len(train_coords)
     # print(len(train_coords))  # 480722
@@ -82,7 +82,6 @@ def train(epoch, train_coords, train_values):
 
 for epoch in range(epochs):
     train(epoch, train_coords, train_values)
-    '''
 
 
 print('test started !')
