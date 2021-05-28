@@ -66,7 +66,12 @@ class ContextualizedNN(nn.Module):
                                torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][9]).unsqueeze(1))
                     ))
                 per_user_item_rep.append(item_rep)
+            # 여기서 각 user 별로 item representation 평균내는 거 빠졌음 -_ :;;
+            # 밑에 거는 batch user 임, 개별 user 아님 !!!
             batch_user_item_rep.append(torch.mean(torch.stack(per_user_item_rep), dim=0))
+        # 정작 필요한 건 user, item representation 인데,
+        # 이게 batch 로 모여 있어서, 중간에 저장할 방법 찾아야 ...
+        # item_rep_list 랑 per_
 
         interaction_list = [batch_user_item_rep[i] * item_rep_list[i] for i in range(len(batch_user_item_rep))]
         # print('interaction_list length : ', len(interaction_list))  #  100
