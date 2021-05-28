@@ -2,13 +2,9 @@ import numpy as np
 from sknetwork.ranking import PageRank
 from collections import defaultdict
 import pickle
-import time
 import os
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-from utils import get_movie_matrix
 
 
 def compute_factor_distribution(data_dir, top_k):
@@ -44,6 +40,35 @@ def compute_factor_distribution(data_dir, top_k):
     return per_item_diff_dict
 
 
+class ContextFeatures(object):
+    def __init__(self, data_dir, top_k):
+        self.data_dir = data_dir
+        self.top_k = top_k
+
+        with open(os.path.join(self.data_dir, 'per_item_idx.dict'), 'rb') as f:
+            idx_dict = pickle.load(f)
+        self.idx_values = np.array(list(idx_dict.values()))  # shape: (3952, 5, 3951)
+
+        with open(os.path.join(self.data_dir, 'per_item_ppr.dict'), 'rb') as f:
+            ppr_dict = pickle.load(f)
+        self.ppr_scores = np.array(list(ppr_dict.values())) # shape: (3952, 5, 3951)
+
+    def neighbor_embeds(self, target_idx):
+        first_neighbors = self.idx_values[target_idx, 0, :self.top_k].flatten()
+        sec_neighbors = self.idx_values[target_idx, 1, :self.top_k].flatten()
+        third_neighbors = self.idx_values[target_idx, 2, :self.top_k].flatten()
+        four_neighbors = self.idx_values[target_idx, 3, :self.top_k].flatten()
+        fif_neighbors = self.idx_values[target_idx, 4, :self.top_k].flatten()
+
+        first_scores = self.ppr_scores[target_idx, 0, :self.top_k].flatten()
+        sec_scores = self.ppr_scores[target_idx, 1, :self.top_k].flatten()
+        third_scores = self.ppr_scores[target_idx, 2, :self.top_k].flatten()
+        four_scores = self.ppr_scores[target_idx, 3, :self.top_k].flatten()
+        fif_scores = self.ppr_scores[target_idx, 4, :self.top_k].flatten()
+        return [first_neighbors, first_scores, sec_neighbors, sec_scores,
+                third_neighbors, third_scores, four_neighbors, four_scores, fif_neighbors, fif_scores]
+
+
 class MultiPPR(object):
     def __init__(self, damping_factors, movie_mat):
         super(MultiPPR, self).__init__()
@@ -65,39 +90,6 @@ class MultiPPR(object):
         return np.array(multi_score), np.array(indices)
 
 
-class ContextFeatures(object):
-    def __init__(self, data_dir, top_k):
-        self.data_dir = data_dir
-        self.top_k = top_k
-
-        with open(os.path.join(self.data_dir, 'per_item_idx.dict'), 'rb') as f:
-            idx_dict = pickle.load(f)
-        self.idx_values = np.array(list(idx_dict.values()))
-        # np.shape(item_idx) : (3952, 1, 5, 3951) -> (3952, 5, 3951) with dictionary format change
-
-        with open(os.path.join(self.data_dir, 'per_item_ppr.dict'), 'rb') as f:
-            ppr_dict = pickle.load(f)
-        self.ppr_scores = np.array(list(ppr_dict.values()))
-
-    def neighbor_embeds(self, target_idx):
-        # target_idx 를 여러 개 list 로 넘기면, 각 id 별로 factor 를 읽어서 합친 다음 반환함
-        # ex. idx = [1, 3, 5, 16] 의 4 개 id 를 넘기면
-        # 1st factor 4 개가 concatenate 되서 20 x 4 = 80 length 로 반환
-        first_neighbors = self.idx_values[target_idx, 0, :self.top_k].flatten()
-        sec_neighbors = self.idx_values[target_idx, 1, :self.top_k].flatten()
-        third_neighbors = self.idx_values[target_idx, 2, :self.top_k].flatten()
-        four_neighbors = self.idx_values[target_idx, 3, :self.top_k].flatten()
-        fif_neighbors = self.idx_values[target_idx, 4, :self.top_k].flatten()
-
-        first_scores = self.ppr_scores[target_idx, 0, :self.top_k].flatten()
-        sec_scores = self.ppr_scores[target_idx, 1, :self.top_k].flatten()
-        third_scores = self.ppr_scores[target_idx, 2, :self.top_k].flatten()
-        four_scores = self.ppr_scores[target_idx, 3, :self.top_k].flatten()
-        fif_scores = self.ppr_scores[target_idx, 4, :self.top_k].flatten()
-        return [first_neighbors, first_scores, sec_neighbors, sec_scores,
-                third_neighbors, third_scores, four_neighbors, four_scores, fif_neighbors, fif_scores]
-
-
 class ItemLinear(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(ItemLinear, self).__init__()
@@ -107,15 +99,26 @@ class ItemLinear(nn.Module):
         self.final = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, index, score):
-        x = F.relu(self.ln1(index))  # 20 -> 200
-        x = F.relu(self.ln2(x))  # 200 -> 200
-        x = self.ln3(x)  # 200 -> 200
-        # print('x length : ', len(x))  # x length :  200
-        # print('score length : ', len(score))  # score length :  20
-        support = score.repeat_interleave(len(x) // len(score))
-        # print(support.shape)  # torch.Size([200])
+        # print('index : ', index.shape)  # torch.Size([20, 1])
+        # print('score : ', score.shape)  # torch.Size([20, 1])
+        x = self.ln1(index)
+        x = self.ln2(x)
+        x = self.ln3(x)  # torch.Size([20, 100])
+
+        # x.shape[1] = 100 , score.shape[1] = 1
+        support = score.repeat_interleave(x.shape[1] // score.shape[1], axis=1)
+        # print('support shape : ', support.shape)  # torch.Size([20, 100])
+        # print('support : ', support)
+        # support :  tensor([[0.0011, 0.0011, 0.0011,  ..., 0.0011, 0.0011, 0.0011],
+        #         [0.0011, 0.0011, 0.0011,  ..., 0.0011, 0.0011, 0.0011],
+        #         [0.0010, 0.0010, 0.0010,  ..., 0.0010, 0.0010, 0.0010],
+        #         ...,
+        #         [0.0008, 0.0008, 0.0008,  ..., 0.0008, 0.0008, 0.0008],
+        #         [0.0008, 0.0008, 0.0008,  ..., 0.0008, 0.0008, 0.0008],
+        #         [0.0008, 0.0008, 0.0008,  ..., 0.0008, 0.0008, 0.0008]])
+        # x 와 support 순서 바뀌어도 상관없음 !
         x = torch.mul(x, support)
-        # print(x.shape)  # torch.Size([200])
+        # x = torch.mul(support, x)
         x = self.final(x)
         return x
 
@@ -124,7 +127,23 @@ if __name__ == '__main__':
     data_dir = './data/ml-1m/'
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
+    top_k = 20
 
+    cf = ContextFeatures(data_dir, top_k)
+    with open(os.path.join(data_dir, 'unique_sidx'), 'rb') as f:
+        unique_sidx = pickle.load(f)
+
+    item_context = {}
+    for i in range(len(unique_sidx)):
+        item_context[unique_sidx[i]] = cf.neighbor_embeds(target_idx=unique_sidx[i])
+
+    # len(item_cst.dict) = 3533
+    with open(os.path.join(data_dir, 'item_cxt_top_20.dict'), 'wb') as f:
+        pickle.dump(item_context, f)
+
+    '''
+    # PPR calculation takes about 5 hours on my Mac (16GB),
+    # and takes about 3 hours on desktop (32GB)    
     damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
     movie_mat = get_movie_matrix(data_dir)
     multi_ppr = MultiPPR(damping_factors, movie_mat)
@@ -146,3 +165,5 @@ if __name__ == '__main__':
         pickle.dump(per_item_ppr_dict, f)
     with open(os.path.join(data_dir, 'per_item_idx.dict'), 'wb') as f:
         pickle.dump(per_item_idx_dict, f)
+    '''
+
