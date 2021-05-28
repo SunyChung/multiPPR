@@ -13,8 +13,8 @@ parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
 parser.add_argument('--top_k', type=int, default=20)
 parser.add_argument('--damping_factors', type=list, default=[0.30, 0.50, 0.70, 0.85, 0.95])
 parser.add_argument('--learning_rate', type=float, default=0.005, help='initial learning rate')
+parser.add_argument('--batch_size', type=int, default=100)
 parser.add_argument('--epochs', type=int, default=10, help='the number of epochs to train')
-parser.add_argument('--batch_size', type=int, default=100, help='the batch size for each epoch')
 parser.add_argument('--input_dim', type=int, default=20, help='should be the top_k node idxs length')
 parser.add_argument('--hidden_dim', type=int, default=100)
 parser.add_argument('--output_dim', type=int, default=10)
@@ -24,8 +24,8 @@ data_dir = args.data_dir
 top_k = args.top_k
 damping_factors = args.damping_factors
 learning_rate = args.learning_rate
-epochs = 1
 batch_size = args.batch_size
+epochs = 1
 input_dim = args.top_k  # 20
 hidden_dim = input_dim * 10
 output_dim = args.output_dim
@@ -44,16 +44,15 @@ print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
-# print(train_coords)
+# print(train_coords)  # user, item index lists
 # print(train_coords.shape)  # (480722, 2)
 # print(train_values)
-train_n = len(train_coords)
-idxlist = list(range(train_n))
-print('idxlist length : ', len(idxlist))
 
-
+'''
 def train(epoch, train_coords, train_values):
+    train_n = len(train_coords)
     # print(len(train_coords))  # 480722
+    idxlist = list(range(train_n))
     print('epoch : ', epoch)
     start = time.time()
     model.train()
@@ -66,19 +65,10 @@ def train(epoch, train_coords, train_values):
         end_idx = min(st_idx + batch_size, 110)
         # end_idx = min(st_idx + batch_size, train_n)
         user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
-        print('user_idxs : ', user_idxs)
         item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
-
         predictions = model(user_idxs, item_idxs)
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
-        # tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        #         1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        #         1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        #         1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        #         1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        #         1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
-        # print('targets shape: ', targets.shape)  # torch.Size([100])
-
+        # print('targets shape: ', targets.shape)  # torch.Size([100]) = batch_size
         train_loss = loss(predictions, targets)
         loss_list.append(train_loss.detach().numpy())
         train_loss.backward()
@@ -90,30 +80,34 @@ def train(epoch, train_coords, train_values):
           '\ntime : {:.4f}s'.format(time.time() - start))
 
 
-# epoch = 0 에선 잘 돌아가고, 왜 다음 epoch 에서 index 를 못 읽어오나 ??
-# 아, 뒤에 있는 엉청한 코드 땜에 ;;;;;;;;;;;;;;;;
-# 드디어 해결 완료 !! 이제 GPU 가즈아 ~~
 for epoch in range(epochs):
     train(epoch, train_coords, train_values)
+    '''
 
-'''
-def test():
+
+print('test started !')
+def test(test_coords, test_values):
+    test_n = len(test_coords)
+    idxlist = list(range(test_n))
     model.eval()
     loss = nn.BCELoss()
     loss_list = []
-    for i in range(test_n):
-        user_idx = test_coords[i, 0]
-        item_idx = test_coords[i, 1]
+    for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
+        end_idx = min(st_idx+batch_size, test_n)
+        user_idx = test_coords[idxlist[st_idx:end_idx]][:, 0]
+        item_idx = test_coords[idxlist[st_idx:end_idx]][:, 1]
         prediction = model(user_idx, item_idx)
-        target = torch.Tensor([test_values[i]])
-        test_loss = loss(prediction, target)
-        loss_list.append(test_loss)
+        targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]])
+        test_loss = loss(prediction, targets)
+        loss_list.append(test_loss.detach().numpy())
     return loss_list
 
 
 test_coords, test_values, _ = get_sparse_coord_value_shape(test_data_tr)
+# print('test_coords ', test_coords)
+# print('test_values ', test_values)
 test_n = len(test_coords)
+print('test_n : ', test_n)
 
-loss_list = test()
+loss_list = test(test_coords, test_values)
 print(np.mean(loss_list))
-'''
