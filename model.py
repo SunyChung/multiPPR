@@ -23,7 +23,6 @@ class ContextualizedNN(nn.Module):
         self.interact_linear = nn.Linear(output_dim * 5, 1)  # 5 factor output -> final output
 
     def forward(self, user_idxs, item_idxs):
-        print('NN user_idxs : ', user_idxs)
         batch_item_rep_list = []
         for i in range(len(item_idxs)):
             item_rep = torch.cat((
