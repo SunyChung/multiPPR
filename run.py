@@ -48,14 +48,6 @@ train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
 # print(train_coords.shape)  # (480722, 2)
 # print(train_values)
 
-if device == 'cuda':
-    train_data = train_data.to(device)
-    vad_data_tr = vad_data_tr.to(device)
-    vad_data_te = vad_data_te.to(device)
-    test_data_tr = test_data_tr.to(device)
-    test_data_te = test_data_te.to(device)
-    model = model.to(device)
-
 
 def train(epoch, train_coords, train_values):
     train_n = len(train_coords)
@@ -72,10 +64,10 @@ def train(epoch, train_coords, train_values):
         print('batch num : ', batch_num)
         end_idx = min(st_idx + batch_size, 110)
         # end_idx = min(st_idx + batch_size, train_n)
-        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
-        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
+        user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0].to(device)
+        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1].to(device)
         predictions = model(user_idxs, item_idxs)
-        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
+        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
         # print('targets shape: ', targets.shape)  # torch.Size([100]) = batch_size
         train_loss = loss(predictions, targets)
         loss_list.append(train_loss.detach().numpy())
@@ -103,10 +95,10 @@ def test(test_coords, test_values):
     loss_list = []
     for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
         end_idx = min(st_idx+batch_size, test_n)
-        user_idx = test_coords[idxlist[st_idx:end_idx]][:, 0]
-        item_idx = test_coords[idxlist[st_idx:end_idx]][:, 1]
+        user_idx = test_coords[idxlist[st_idx:end_idx]][:, 0].to(device)
+        item_idx = test_coords[idxlist[st_idx:end_idx]][:, 1].to(device)
         prediction = model(user_idx, item_idx)
-        targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]])
+        targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]]).to(device)
         test_loss = loss(prediction, targets)
         loss_list.append(test_loss.detach().numpy())
     return loss_list
