@@ -100,7 +100,7 @@ def test(test_coords, test_values):
         prediction = model(user_idx, item_idx)
         targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]]).to(device)
         test_loss = loss(prediction, targets)
-        loss_list.append(test_loss.detach().numpy())
+        loss_list.append(test_loss.detach())
     return loss_list
 
 
