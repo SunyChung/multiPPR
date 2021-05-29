@@ -70,7 +70,7 @@ def train(epoch, train_coords, train_values):
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
         # print('targets shape: ', targets.shape)  # torch.Size([100]) = batch_size
         train_loss = loss(predictions, targets)
-        loss_list.append(train_loss.detach())
+        loss_list.append(train_loss.detach().item())
         train_loss.backward()
         optimizer.step()
 
@@ -100,7 +100,7 @@ def test(test_coords, test_values):
         prediction = model(user_idx, item_idx)
         targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]]).to(device)
         test_loss = loss(prediction, targets)
-        loss_list.append(test_loss.detach())
+        loss_list.append(test_loss.detach().item())
     return loss_list
 
 
