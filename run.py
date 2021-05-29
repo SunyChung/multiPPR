@@ -58,25 +58,22 @@ def train(epoch, train_coords, train_values):
     model.train()
     optimizer.zero_grad()
     loss = nn.BCELoss()
-    loss_list = []
-    # for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
-    for batch_num, st_idx in enumerate(range(0, 110, batch_size)):
+    # loss_list = []
+    for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
         print('batch num : ', batch_num)
-        end_idx = min(st_idx + batch_size, 110)
-        # end_idx = min(st_idx + batch_size, train_n)
+        end_idx = min(st_idx + batch_size, train_n)
         user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
         item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
         predictions = model(user_idxs, item_idxs)
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
         # print('targets shape: ', targets.shape)  # torch.Size([100]) = batch_size
         train_loss = loss(predictions, targets)
-        loss_list.append(train_loss.detach().item())
+        # loss_list.append(train_loss.detach().item())
         train_loss.backward()
         optimizer.step()
 
-    print('loss_list : ', loss_list)
     print('epoch : {:04d}'.format(epoch),
-          '\nmean train_loss : {:.4f}'.format(np.mean(loss_list)),
+          #'\nmean train_loss : {:.4f}'.format(np.mean(loss_list)),
           '\ntime : {:.4f}s'.format(time.time() - start))
 
 
