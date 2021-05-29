@@ -9,6 +9,8 @@ from layers import ItemLinear
 class ContextualizedNN(nn.Module):
     def __init__(self, data_dir, item_cxt_dict, input_dim, hidden_dim, output_dim, top_k):
         super(ContextualizedNN, self).__init__()
+        
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         with open(os.path.join(data_dir, 'per_user_item.dict'), 'rb') as f:
             self.per_user_item_dict = pickle.load(f)
@@ -26,20 +28,20 @@ class ContextualizedNN(nn.Module):
         batch_item_rep_list = []
         for i in range(len(item_idxs)):
             item_rep = torch.cat((
-                self.com_1(torch.Tensor(self.item_cxt_dict[item_idxs[i]][0]),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][1])),
+                self.com_1(torch.Tensor(self.item_cxt_dict[item_idxs[i]][0]).to(self.device),
+                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][1]).to(self.device)),
 
-                self.com_2(torch.Tensor(self.item_cxt_dict[item_idxs[i]][2]),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][3])),
+                self.com_2(torch.Tensor(self.item_cxt_dict[item_idxs[i]][2]).to(self.device),
+                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][3]).to(self.device)),
 
-                self.com_3(torch.Tensor(self.item_cxt_dict[item_idxs[i]][4]),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][5])),
+                self.com_3(torch.Tensor(self.item_cxt_dict[item_idxs[i]][4]).to(self.device),
+                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][5]).to(self.device)),
 
-                self.com_4(torch.Tensor(self.item_cxt_dict[item_idxs[i]][6]),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][7])),
+                self.com_4(torch.Tensor(self.item_cxt_dict[item_idxs[i]][6]).to(self.device),
+                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][7]).to(self.device)),
 
-                self.com_5(torch.Tensor(self.item_cxt_dict[item_idxs[i]][8]),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][9]))
+                self.com_5(torch.Tensor(self.item_cxt_dict[item_idxs[i]][8]).to(self.device),
+                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][9]).to(self.device))
                 ))
             # print('item_rep shape : ', item_rep.shape)  # torch.Size([50])
             batch_item_rep_list.append(item_rep)
@@ -56,20 +58,20 @@ class ContextualizedNN(nn.Module):
             for j in range(len(batch_user_item_list[i])):
                 item_rep = torch.cat((
                     # item_cxt_dict 자체가 20 개 값을 반환 : 이 값이 20 개의 idx 값
-                    self.com_1(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][0]),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][1])),
+                    self.com_1(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][0]).to(self.device),
+                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][1]).to(self.device)),
 
-                    self.com_2(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][2]),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][3])),
+                    self.com_2(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][2]).to(self.device),
+                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][3]).to(self.device)),
 
-                    self.com_3(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][4]),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][5])),
+                    self.com_3(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][4]).to(self.device),
+                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][5]).to(self.device)),
 
-                    self.com_4(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][6]),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][7])),
+                    self.com_4(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][6]).to(self.device),
+                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][7]).to(self.device)),
 
-                    self.com_5(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][8]),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][9]))
+                    self.com_5(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][8]).to(self.device),
+                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][9]).to(self.device))
                     ))
                 # print('item_rep shape : ', item_rep.shape)  # torch.Size([50])
                 per_user_item_list.append(item_rep)
