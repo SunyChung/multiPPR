@@ -3,8 +3,9 @@ import pandas as pd
 import pickle
 from scipy import sparse
 from scipy.sparse import csr_matrix, isspmatrix_coo
+from sknetwork.ranking import PageRank
 import os
-import torch
+import time
 
 
 def get_bipartite_matrix(data_dir):
@@ -22,12 +23,11 @@ def get_bipartite_matrix(data_dir):
     col = col.loc[col.isin(train_mapped_id)]  # Length: 574514,
     row = df['userId'].map(uid_to_uidx) # 574548
     row = row[col.index]  # Length: 574514
-
     # .map() or .apply(lambda x : )
     # row = df['userId'].apply(lambda x: uid_to_uidx[x])
     # col = df['movieId'].apply(lambda x: mid_to_midx[x])
     data = np.ones(len(row), dtype=int)
-    # careful with the matirx shape !! : max() NOT len() -_
+    # careful with the matirx shape !! : max() NOT len() -_;
     bi_matrix = csr_matrix((data, (row, col)), shape=(max(uid_to_uidx), max(train_mapped_id)+1))
     return bi_matrix
 
@@ -36,6 +36,12 @@ def get_movie_matrix(data_dir):
     bi_matrix = get_bipartite_matrix(data_dir)
     movie_matrix = bi_matrix.transpose() * bi_matrix
     return movie_matrix
+
+
+def get_user_matrix(data_dir):
+    bi_matrix = get_bipartite_matrix(data_dir)
+    user_matrix = bi_matrix * bi_matrix.transpose()
+    return user_matrix
 
 
 # 이것도 index 로 mapping 시켜야 되나 ?? YES !!!
@@ -118,8 +124,75 @@ def get_sparse_coord_value_shape(sparse_mat):
     return coords, values, shape
 
 
+class MultiPPR(object):
+    def __init__(self, damping_factors, matrix):
+        super(MultiPPR, self).__init__()
+        self.damping_factors = damping_factors
+        self.mat = matrix
+
+    def multi_contexts(self, target_idx):
+        base_zeros = np.zeros(self.mat.shape[0] - 1)
+        seed = np.insert(base_zeros, target_idx, 1)
+        multi_score = []
+        indices = []
+        for i in range(len(self.damping_factors)):
+            pagerank = PageRank(damping_factor=self.damping_factors[i])
+            ppr = pagerank.fit_transform(self.mat.toarray(), seeds=seed)
+            idx = np.argsort(ppr)[::-1][1:]
+            sorted_scores = ppr[idx]
+            multi_score.append(np.array(sorted_scores))
+            indices.append(np.array(idx))
+        return np.array(multi_score), np.array(indices)
+
+
 if __name__ == '__main__':
     data_dir = './data/ml-1m/'
+
+    # PPR calculation takes about 5 hours on my Mac (16GB),
+    # and takes about 3 hours on desktop (32GB)    
+    damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
+    user_mat = get_user_matrix(data_dir)
+    print('user_mat shape : ', user_mat.shape)
+    multi_ppr = MultiPPR(damping_factors, user_mat)
+
+    start = time.time()
+    # the default dictionary type is sufficient 'cause the return values already has multi array values !!!
+    per_item_ppr_dict = {}
+    per_item_idx_dict = {}
+    for i in range(user_mat.shape[0]):
+        scores, indices = multi_ppr.multi_contexts(i)
+        per_item_ppr_dict[i] = scores
+        per_item_idx_dict[i] = indices
+        if i % 10 == 0:
+            print('%d nodes processed!' % i)
+    end = time.time()
+    print('multi-ppr processing takes : ', end - start)
+
+    with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'wb') as f:
+        pickle.dump(per_item_ppr_dict, f)
+    with open(os.path.join(data_dir, 'per_user_idx.dict'), 'wb') as f:
+        pickle.dump(per_item_idx_dict, f)
+
+    '''
+    movie_mat = get_movie_matrix(data_dir)
+    multi_ppr = MultiPPR(damping_factors, movie_mat)
+    start = time.time()
+    per_item_ppr_dict = {}
+    per_item_idx_dict = {}
+    for i in range(movie_mat.shape[0]):
+        scores, indices = multi_ppr.multi_contexts(i)
+        per_item_ppr_dict[i] = scores
+        per_item_idx_dict[i] = indices
+        if i % 10 == 0:
+            print('%d nodes processed!' % i)
+    end = time.time()
+    print('multi-ppr processing takes : ', end - start)
+    with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'wb') as f:
+        pickle.dump(per_item_ppr_dict, f)
+    with open(os.path.join(data_dir, 'per_item_idx.dict'), 'wb') as f:
+        pickle.dump(per_item_idx_dict, f)
+
     _, per_user_item_dict = get_user_sequences(data_dir)
     with open(data_dir + 'per_user_item.dict', 'wb') as f:
         pickle.dump(per_user_item_dict, f)
+    '''
