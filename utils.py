@@ -157,24 +157,25 @@ if __name__ == '__main__':
 
     start = time.time()
     # the default dictionary type is sufficient 'cause the return values already has multi array values !!!
-    per_item_ppr_dict = {}
-    per_item_idx_dict = {}
+    per_user_ppr_dict = {}
+    per_user_idx_dict = {}
     for i in range(user_mat.shape[0]):
         scores, indices = multi_ppr.multi_contexts(i)
-        per_item_ppr_dict[i] = scores
-        per_item_idx_dict[i] = indices
+        per_user_ppr_dict[i] = scores
+        per_user_idx_dict[i] = indices
         if i % 10 == 0:
             print('%d nodes processed!' % i)
     end = time.time()
     print('multi-ppr processing takes : ', end - start)
 
     with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'wb') as f:
-        pickle.dump(per_item_ppr_dict, f)
+        pickle.dump(per_user_ppr_dict, f)
     with open(os.path.join(data_dir, 'per_user_idx.dict'), 'wb') as f:
-        pickle.dump(per_item_idx_dict, f)
+        pickle.dump(per_user_idx_dict, f)
 
     '''
     movie_mat = get_movie_matrix(data_dir)
+    print('movie_mat shape : ', movie_mat.shape)
     multi_ppr = MultiPPR(damping_factors, movie_mat)
     start = time.time()
     per_item_ppr_dict = {}
