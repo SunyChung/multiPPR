@@ -1,94 +1,65 @@
+import numpy as np
 import pickle
 import os
 import torch
 import torch.nn as nn
 
-from layers import ItemLinear
+from layers import LinearRep, PPRfeatures
 
 
 class ContextualizedNN(nn.Module):
-    def __init__(self, data_dir, item_cxt_dict, input_dim, hidden_dim, output_dim, top_k):
+    def __init__(self, data_dir, item_idx_emb, item_scr_emb, user_idx_emb, user_scr_emb,
+                 input_dim, hidden_dim, output_dim, final_dim):
         super(ContextualizedNN, self).__init__()
-        
+
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.item_idx_emb = item_idx_emb
+        self.item_scr_emb = item_scr_emb
+        self.user_idx_emb = user_idx_emb
+        self.user_scr_emb = user_scr_emb
 
-        with open(os.path.join(data_dir, 'per_user_item.dict'), 'rb') as f:
-            self.per_user_item_dict = pickle.load(f)
-        self.item_cxt_dict = item_cxt_dict
+        self.item_rep = LinearRep(input_dim, hidden_dim, output_dim, item_idx_emb, item_scr_emb)
+        self.user_rep = LinearRep(input_dim, hidden_dim, output_dim, user_idx_emb, user_scr_emb)
+        self.inter_lin = nn.Linear(output_dim, final_dim)
 
-        self.com_1 = ItemLinear(input_dim, hidden_dim, output_dim)
-        self.com_2 = ItemLinear(input_dim, hidden_dim, output_dim)
-        self.com_3 = ItemLinear(input_dim, hidden_dim, output_dim)
-        self.com_4 = ItemLinear(input_dim, hidden_dim, output_dim)
-        self.com_5 = ItemLinear(input_dim, hidden_dim, output_dim)  # 1 -> 100 -> 10
-
-        self.interact_linear = nn.Linear(output_dim * 5, 1)  # 5 factor output -> final output
-
-    def forward(self, user_idxs, item_idxs):
-        batch_item_rep_list = []
-        for i in range(len(item_idxs)):
-            item_rep = torch.cat((
-                self.com_1(torch.Tensor(self.item_cxt_dict[item_idxs[i]][0]).to(self.device),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][1]).to(self.device)),
-
-                self.com_2(torch.Tensor(self.item_cxt_dict[item_idxs[i]][2]).to(self.device),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][3]).to(self.device)),
-
-                self.com_3(torch.Tensor(self.item_cxt_dict[item_idxs[i]][4]).to(self.device),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][5]).to(self.device)),
-
-                self.com_4(torch.Tensor(self.item_cxt_dict[item_idxs[i]][6]).to(self.device),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][7]).to(self.device)),
-
-                self.com_5(torch.Tensor(self.item_cxt_dict[item_idxs[i]][8]).to(self.device),
-                           torch.Tensor(self.item_cxt_dict[item_idxs[i]][9]).to(self.device))
-                ))
-            # print('item_rep shape : ', item_rep.shape)  # torch.Size([50])
-            batch_item_rep_list.append(item_rep)
-        # 각각의 item index 에 대한 dimension 은 10 (=ouput_dim) x 5 (=factor) = 50
-        # batch_item_rep_list 는 batch size 만큼의 lenght = 100 를 가지는 게 맞음 !
-        # print('batch_item_rep_list length : ', len(batch_item_rep_list))  # 100
-
-        # get item sequence for each user
-        batch_user_item_list = [self.per_user_item_dict[i] for i in user_idxs]
-        # batch user representation list
-        batch_user_item_rep_list = []
-        for i in range(len(batch_user_item_list)):
-            per_user_item_list = []
-            for j in range(len(batch_user_item_list[i])):
-                item_rep = torch.cat((
-                    # item_cxt_dict 자체가 20 개 값을 반환 : 이 값이 20 개의 idx 값
-                    self.com_1(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][0]).to(self.device),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][1]).to(self.device)),
-
-                    self.com_2(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][2]).to(self.device),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][3]).to(self.device)),
-
-                    self.com_3(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][4]).to(self.device),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][5]).to(self.device)),
-
-                    self.com_4(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][6]).to(self.device),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][7]).to(self.device)),
-
-                    self.com_5(torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][8]).to(self.device),
-                               torch.Tensor(self.item_cxt_dict[batch_user_item_list[i][j]][9]).to(self.device))
-                    ))
-                # print('item_rep shape : ', item_rep.shape)  # torch.Size([50])
-                per_user_item_list.append(item_rep)
-            per_user_item_rep = torch.mean(torch.stack(per_user_item_list), dim=0)
-            # print('per_user_item_rep shape : ', per_user_item_rep.shape)  # torch.Size([50])
-            batch_user_item_rep_list.append(per_user_item_rep)
-        # 정작 필요한 건 user, item representation 인데,
-        # 이게 batch 로 모여 있어서, 중간에 저장할 방법 찾아야 ...
-
-        interaction_list = [batch_user_item_rep_list[i] * batch_item_rep_list[i]
-                            for i in range(len(batch_user_item_rep_list))]
-        # print('interaction_list length : ', len(interaction_list))  # 100
-        # print('interaction_list[0] shape : ', interaction_list[0].shape)  # torch.Size([50])
-        batch_prediction = [torch.sigmoid(self.interact_linear(interaction_list[i]))
-                            for i in range(len(interaction_list))]
-        # print('batch_prediction[0] shape : ', batch_prediction[0].shape)  # torch.Size([1])
-        result = torch.stack(batch_prediction).squeeze(1)
-        # print('result shape : ', result.shape)  # torch.Size([100])
-        # 결과적으로는 batch size 만큼의 (=100) prediction 값을 반환해야 함
+    def forward(self, item_idxs, user_idxs):
+        item_rep = self.item_rep(item_idxs)
+        user_rep = self.user_rep(user_idxs)
+        interaction = item_rep * user_rep
+        result = torch.sigmoid(self.inter_lin(interaction))
         return result
+
+
+if __name__ == '__main__':
+    data_dir = './data/ml-1m'
+    top_k = 20
+
+    # item context dictionary making
+    with open(os.path.join(data_dir, 'per_item_idx.dict'), 'rb') as f:
+        item_idx_dict = pickle.load(f)
+    with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'rb') as f:
+        item_ppr_dict = pickle.load(f)
+
+    pf = PPRfeatures(data_dir, top_k, item_idx_dict, item_ppr_dict)
+    item_idx_emb = pf.idx_embeds()
+    item_scr_emb = pf.score_embeds()
+    del item_idx_dict
+    del item_ppr_dict
+
+    # user context dictionary making
+    with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'rb') as f:
+        user_idx_dict = pickle.load(f)
+    with open(os.path.join(data_dir, 'per_user_idx.dict'), 'rb') as f:
+        user_ppr_dict = pickle.load(f)
+
+    pf = PPRfeatures(data_dir, top_k, user_idx_dict, user_ppr_dict)
+    user_idx_emb = pf.idx_embeds()
+    user_scr_emb = pf.score_embeds()
+    del user_idx_dict
+    del user_ppr_dict
+
+    # input, hidden, output dimension 잘 생각할 것 ...
+    CN = ContextualizedNN(data_dir, item_idx_emb, item_scr_emb, user_idx_emb, user_scr_emb,
+                          input_dim=top_k*5, hidden_dim=top_k*5*5, output_dim=top_k, final_dim=1)
+    result = CN([1, 4, 5, 8, 9], [1, 1, 1, 1, 1])
+    print('results = ', result)
