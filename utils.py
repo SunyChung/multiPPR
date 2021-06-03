@@ -138,7 +138,9 @@ class MultiPPR(object):
         for i in range(len(self.damping_factors)):
             pagerank = PageRank(damping_factor=self.damping_factors[i])
             ppr = pagerank.fit_transform(self.mat.toarray(), seeds=seed)
-            idx = np.argsort(ppr)[::-1][1:]
+            # don't need to exclude the first element from the start
+            # can filtering the idx afterwards, if necessary
+            idx = np.argsort(ppr)[::-1]
             sorted_scores = ppr[idx]
             multi_score.append(np.array(sorted_scores))
             indices.append(np.array(idx))
