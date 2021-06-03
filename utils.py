@@ -28,7 +28,7 @@ def get_bipartite_matrix(data_dir):
     # col = df['movieId'].apply(lambda x: mid_to_midx[x])
     data = np.ones(len(row), dtype=int)
     # careful with the matirx shape !! : max() NOT len() -_;
-    bi_matrix = csr_matrix((data, (row, col)), shape=(max(uid_to_uidx), max(train_mapped_id)+1))
+    bi_matrix = csr_matrix((data, (row, col)), shape=(max(row)+1, max(col)+1))
     return bi_matrix
 
 
