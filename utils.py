@@ -147,10 +147,8 @@ class MultiPPR(object):
 
 if __name__ == '__main__':
     data_dir = './data/ml-1m/'
-
-    # PPR calculation takes about 5 hours on my Mac (16GB),
-    # and takes about 3 hours on desktop (32GB)    
     damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
+
     user_mat = get_user_matrix(data_dir)
     print('user_mat shape : ', user_mat.shape)
     multi_ppr = MultiPPR(damping_factors, user_mat)
@@ -163,8 +161,9 @@ if __name__ == '__main__':
         scores, indices = multi_ppr.multi_contexts(i)
         per_user_ppr_dict[i] = scores
         per_user_idx_dict[i] = indices
-        if i % 10 == 0:
+        if i % 100 == 0:
             print('%d nodes processed!' % i)
+            print('upto now %f seconds passed' % (time.time() - start))
     end = time.time()
     print('multi-ppr processing takes : ', end - start)
 
@@ -174,6 +173,9 @@ if __name__ == '__main__':
         pickle.dump(per_user_idx_dict, f)
 
     '''
+    # PPR calculation takes about 5 hours on my Mac (16GB),
+    # and takes about 3 hours on desktop (32GB)   
+    damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
     movie_mat = get_movie_matrix(data_dir)
     print('movie_mat shape : ', movie_mat.shape)
     multi_ppr = MultiPPR(damping_factors, movie_mat)
@@ -184,8 +186,9 @@ if __name__ == '__main__':
         scores, indices = multi_ppr.multi_contexts(i)
         per_item_ppr_dict[i] = scores
         per_item_idx_dict[i] = indices
-        if i % 10 == 0:
+        if i % 100 == 0:
             print('%d nodes processed!' % i)
+            print('upto now %f seconds passed' %(time.time() - start))
     end = time.time()
     print('multi-ppr processing takes : ', end - start)
     with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'wb') as f:
