@@ -12,23 +12,33 @@ def get_bipartite_matrix(data_dir):
     # "filtered_ratings.csv" 는 아직 index 값으로 mapping 안 된 상태 !!
     df = pd.read_csv(os.path.join(data_dir, 'filtered_ratings.csv'))
 
+    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
+        train_sid = pickle.load(f)
     with open(os.path.join(data_dir, 'uid_to_uidx.dict'), 'rb') as f:
         uid_to_uidx = pickle.load(f)
-    with open(os.path.join(data_dir, 'mid_to_midx.dict'), 'rb') as f:
-        mid_to_midx = pickle.load(f)
-    with open(os.path.join(data_dir, 'train_mapped_id'), 'rb') as f:
-        train_mapped_id = pickle.load(f)
+    with open(os.path.join(data_dir, 'sid_to_sidx.dict'), 'rb') as f:
+        sid_to_sidx = pickle.load(f)
 
-    col = df['movieId'].map(mid_to_midx)  # Length: 574548,
-    col = col.loc[col.isin(train_mapped_id)]  # Length: 574514,
-    row = df['userId'].map(uid_to_uidx) # 574548
-    row = row[col.index]  # Length: 574514
-    # .map() or .apply(lambda x : )
-    # row = df['userId'].apply(lambda x: uid_to_uidx[x])
-    # col = df['movieId'].apply(lambda x: mid_to_midx[x])
+    col = df['movieId']
+    # print('col len : ', len(col))  # 574548
+    col = col.loc[col.isin(train_sid)]
+    # print('filtered col len : ', len(col))   # 574514
+    # print('before id mapping col max : ', max(col))  # 3952 !!
+    col = col.map(sid_to_sidx)  # 574514
+    # print('mapped col len : ', len(col))  # 574514
+    # print('after id mapping col max : ', max(col))  # 3504 !
+
+    row = df['userId'].map(uid_to_uidx)
+    # print('row len : ', len(row))  # 574548
+    row = row[col.index]
+    # print('row len : ', len(row))  # 574514
+
     data = np.ones(len(row), dtype=int)
-    # careful with the matirx shape !! : max() NOT len() -_;
-    bi_matrix = csr_matrix((data, (row, col)), shape=(max(row)+1, max(col)+1))
+    print('max(row) : ', max(row))  # 6030
+    print('max(col) : ', max(col))  # 3504
+    print('unique row : ', len(pd.unique(row)))  # 6031
+    print('unique col : ', len(pd.unique(col)))  # 3505
+    bi_matrix = csr_matrix((data, (row, col)), shape=(max(row) + 1, max(col) + 1))
     return bi_matrix
 
 
@@ -43,7 +53,8 @@ def get_user_matrix(data_dir):
     user_matrix = bi_matrix * bi_matrix.transpose()
     return user_matrix
 
-
+'''
+# user 를 items sequence 로 사용하지 않아서 이거 없어도 됨 !
 # 이것도 index 로 mapping 시켜야 되나 ?? YES !!!
 def get_user_sequences(data_dir):
     df = pd.read_csv(os.path.join(data_dir, 'filtered_ratings.csv'))
@@ -63,6 +74,7 @@ def get_user_sequences(data_dir):
     # print(max(per_user_item_indices))  # 1435
     # print(min(per_user_item_indices))  # 1
     # print(np.mean(per_user_item_indices))  # 95.26579340076273
+'''
 
 
 # train, validation, test data 는 모두 index 값으로 mapping 된 상태 !
@@ -92,12 +104,12 @@ def load_tr_te_data(csv_file_tr, csv_file_te, n_items):
 
 
 def load_data(data_dir):
-    # 기존 코드들이 사용하던 unique_sid 가 아니라, train_mapped_id 써야 됨 !!
-    with open(os.path.join(data_dir, 'train_mapped_id'), 'rb') as f:
-        train_mapped_id = pickle.load(f)
-    # n_items = len(train_mapped_id)  # + 1 ??
-    # length 가 아니라, id max 값 써야 함 !!
-    n_items = max(train_mapped_id) + 1
+    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
+        train_sid = pickle.load(f)
+    # n_items = max(train_sid)  # 3952 이거 쓰면 안 됨!
+    # mapping 된 값이 3505 이니, 이걸로 !!
+    # sid_to_sidx 도 어차피 len(sid_to_sidx) = 3505
+    n_items = len(train_sid)  # 3505
 
     train_data = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
     vad_data_tr, vad_data_te = load_tr_te_data(os.path.join(data_dir, 'vad_tr.csv'),
@@ -152,7 +164,7 @@ if __name__ == '__main__':
     damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
 
     # PPR calculation takes about 5 hours on my Mac (16GB),
-    # and takes about 3 hours on desktop (32GB)   
+    # and takes about 3 hours on desktop (32GB)
     movie_mat = get_movie_matrix(data_dir)
     print('movie_mat shape : ', movie_mat.shape)
     multi_ppr = MultiPPR(damping_factors, movie_mat)
@@ -165,7 +177,7 @@ if __name__ == '__main__':
         per_item_idx_dict[i] = indices
         if i % 100 == 0:
             print('%d nodes processed!' % i)
-            print('upto now %f seconds passed' %(time.time() - start))
+            print('upto now %f seconds passed' % (time.time() - start))
     end = time.time()
     print('multi-ppr processing takes : ', end - start)
     with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'wb') as f:
@@ -173,11 +185,7 @@ if __name__ == '__main__':
     with open(os.path.join(data_dir, 'per_item_idx.dict'), 'wb') as f:
         pickle.dump(per_item_idx_dict, f)
 
-    _, per_user_item_dict = get_user_sequences(data_dir)
-    with open(data_dir + 'per_user_item.dict', 'wb') as f:
-        pickle.dump(per_user_item_dict, f)
-    
-   
+
     '''
     user_mat = get_user_matrix(data_dir)
     print('user_mat shape : ', user_mat.shape)
