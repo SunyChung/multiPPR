@@ -151,33 +151,8 @@ if __name__ == '__main__':
     data_dir = './data/ml-1m/'
     damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
 
-    user_mat = get_user_matrix(data_dir)
-    print('user_mat shape : ', user_mat.shape)
-    multi_ppr = MultiPPR(damping_factors, user_mat)
-
-    start = time.time()
-    # the default dictionary type is sufficient 'cause the return values already has multi array values !!!
-    per_user_ppr_dict = {}
-    per_user_idx_dict = {}
-    for i in range(user_mat.shape[0]):
-        scores, indices = multi_ppr.multi_contexts(i)
-        per_user_ppr_dict[i] = scores
-        per_user_idx_dict[i] = indices
-        if i % 100 == 0:
-            print('%d nodes processed!' % i)
-            print('upto now %f seconds passed' % (time.time() - start))
-    end = time.time()
-    print('multi-ppr processing takes : ', end - start)
-
-    with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'wb') as f:
-        pickle.dump(per_user_ppr_dict, f)
-    with open(os.path.join(data_dir, 'per_user_idx.dict'), 'wb') as f:
-        pickle.dump(per_user_idx_dict, f)
-
-    '''
     # PPR calculation takes about 5 hours on my Mac (16GB),
     # and takes about 3 hours on desktop (32GB)   
-    damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
     movie_mat = get_movie_matrix(data_dir)
     print('movie_mat shape : ', movie_mat.shape)
     multi_ppr = MultiPPR(damping_factors, movie_mat)
@@ -201,4 +176,29 @@ if __name__ == '__main__':
     _, per_user_item_dict = get_user_sequences(data_dir)
     with open(data_dir + 'per_user_item.dict', 'wb') as f:
         pickle.dump(per_user_item_dict, f)
+    
+   
+    '''
+    user_mat = get_user_matrix(data_dir)
+    print('user_mat shape : ', user_mat.shape)
+    multi_ppr = MultiPPR(damping_factors, user_mat)
+
+    start = time.time()
+    # the default dictionary type is sufficient 'cause the return values already has multi array values !!!
+    per_user_ppr_dict = {}
+    per_user_idx_dict = {}
+    for i in range(user_mat.shape[0]):
+        scores, indices = multi_ppr.multi_contexts(i)
+        per_user_ppr_dict[i] = scores
+        per_user_idx_dict[i] = indices
+        if i % 100 == 0:
+            print('%d nodes processed!' % i)
+            print('upto now %f seconds passed' % (time.time() - start))
+    end = time.time()
+    print('multi-ppr processing takes : ', end - start)
+
+    with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'wb') as f:
+        pickle.dump(per_user_ppr_dict, f)
+    with open(os.path.join(data_dir, 'per_user_idx.dict'), 'wb') as f:
+        pickle.dump(per_user_idx_dict, f)
     '''
