@@ -175,7 +175,7 @@ if __name__ == '__main__':
         scores, indices = multi_ppr.multi_contexts(i)
         per_item_ppr_dict[i] = scores
         per_item_idx_dict[i] = indices
-        if i % 100 == 0:
+        if i % 300 == 0:
             print('%d nodes processed!' % i)
             print('upto now %f seconds passed' % (time.time() - start))
     end = time.time()
@@ -199,7 +199,7 @@ if __name__ == '__main__':
         scores, indices = multi_ppr.multi_contexts(i)
         per_user_ppr_dict[i] = scores
         per_user_idx_dict[i] = indices
-        if i % 100 == 0:
+        if i % 300 == 0:
             print('%d nodes processed!' % i)
             print('upto now %f seconds passed' % (time.time() - start))
     end = time.time()
