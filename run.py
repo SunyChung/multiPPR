@@ -88,7 +88,7 @@ def train(epoch, train_coords, train_values):
         # print('batch num : ', batch_num)
         end_idx = min(st_idx + batch_size, train_n)
         user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
-        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1
+        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
                                                           
         predictions = model(user_idxs, item_idxs)
         # reshaped_pred = torch.mean(predictions, dim=1).squeeze()
