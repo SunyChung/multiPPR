@@ -14,7 +14,7 @@ parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
 parser.add_argument('--damping_factors', type=list, default=[0.30, 0.50, 0.70, 0.85, 0.95])
 parser.add_argument('--learning_rate', type=float, default=5e-4, help='initial learning rate')
 parser.add_argument('--batch_size', type=int, default=500)
-parser.add_argument('--epochs', type=int, default=50)
+parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--multi_factor', type=int, default=5)
 parser.add_argument('--top_k', type=int, default=20)
 parser.add_argument('--input_dim', type=int, default=20, help='top_k x multi_factor')
@@ -91,7 +91,7 @@ def train(epoch, train_coords, train_values):
         item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
         predictions = model(user_idxs, item_idxs)
         reshaped_pred = torch.mean(predictions, dim=1).squeeze()
-        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]]).to(device)
+        targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
         # print('targets shape: ', targets.shape)  # torch.Size([100]) = batch_size
         train_loss = loss(reshaped_pred, targets)
         loss_list.append(train_loss.detach().item())
