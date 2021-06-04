@@ -88,16 +88,16 @@ def train(epoch, train_coords, train_values):
         # print('batch num : ', batch_num)
         end_idx = min(st_idx + batch_size, train_n)
         user_idxs = train_coords[idxlist[st_idx:end_idx]][:, 0]
-        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1]
+        item_idxs = train_coords[idxlist[st_idx:end_idx]][:, 1
+                                                          
         predictions = model(user_idxs, item_idxs)
         # reshaped_pred = torch.mean(predictions, dim=1).squeeze()
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
-
         train_loss = loss(predictions.to('cpu'), targets)
         loss_list.append(train_loss.detach().item())
         train_loss.backward()
         optimizer.step()
-    print('loss_list : ', loss_list)
+    # print('loss_list : ', loss_list)
     print('epoch : {:04d}'.format(epoch),
           '\nmean train_loss : {:.4f}'.format(np.mean(loss_list)),
           '\ntime : {:.4f}s'.format(time.time() - start))
@@ -121,10 +121,10 @@ def test(test_coords, test_values):
         end_idx = min(st_idx+batch_size, test_n)
         user_idx = test_coords[idxlist[st_idx:end_idx]][:, 0]
         item_idx = test_coords[idxlist[st_idx:end_idx]][:, 1]
+
         prediction = model(user_idx, item_idx)
-        reshaped_pred = torch.mean(prediction, dim=1).squeeze()
         targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]])
-        test_loss = loss(reshaped_pred, targets)
+        test_loss = loss(reshaped_pred.to('cpu'), targets)
         loss_list.append(test_loss.detach())
     return loss_list
 
