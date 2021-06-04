@@ -12,15 +12,15 @@ class ContextualizedNN(nn.Module):
         super(ContextualizedNN, self).__init__()
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.item_idx_emb = item_idx_emb
-        self.item_scr_emb = item_scr_emb
-        self.user_idx_emb = user_idx_emb
-        self.user_scr_emb = user_scr_emb
+        self.item_idx_emb = item_idx_emb.to(self.device)
+        self.item_scr_emb = item_scr_emb.to(self.device)
+        self.user_idx_emb = user_idx_emb.to(self.device)
+        self.user_scr_emb = user_scr_emb.to(self.device)
 
         self.inter_input_dim = output_dim // multi_factor
-        self.item_rep = LinearRep(input_dim, hidden_dim, output_dim, multi_factor, item_idx_emb, item_scr_emb)
-        self.user_rep = LinearRep(input_dim, hidden_dim, output_dim, multi_factor, user_idx_emb, user_scr_emb)
-        self.inter_lin = nn.Linear(self.inter_input_dim, final_dim)
+        self.item_rep = LinearRep(input_dim, hidden_dim, output_dim, multi_factor, item_idx_emb, item_scr_emb).to(self.device)
+        self.user_rep = LinearRep(input_dim, hidden_dim, output_dim, multi_factor, user_idx_emb, user_scr_emb).to(self.device)
+        self.inter_lin = nn.Linear(self.inter_input_dim, final_dim).to(self.device)
 
     def forward(self, user_idxs, item_idxs):
         user_rep = self.user_rep(user_idxs)
