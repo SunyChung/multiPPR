@@ -6,20 +6,20 @@ import torch.nn as nn
 class LinearRep(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, multi_factor, id_emb, scr_emb):
         super(LinearRep, self).__init__()
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.multi_factor = multi_factor
         self.reshaped_dim = output_dim // multi_factor
         # print('reshaped_dim : ', self.reshaped_dim)  # 10
-        self.id_emb = id_emb.to(self.device)
-        self.scr_emb = scr_emb.to(self.device)
+        self.id_emb = id_emb
+        self.scr_emb = scr_emb
 
         self.ln1 = nn.Linear(input_dim, input_dim)
         self.ln2 = nn.Linear(input_dim, hidden_dim)
         self.ln3 = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, index):
-        x = self.ln1(self.id_emb(torch.LongTensor(index)).to(self.device))
-        x = torch.mul(x, self.scr_emb(torch.LongTensor(index)).to(self.device))
+        x = self.ln1(self.id_emb(torch.LongTensor(index)))
+        x = torch.mul(x, self.scr_emb(torch.LongTensor(index)))
         x = self.ln2(x)
         x = self.ln3(x).reshape(-1, self.multi_factor, self.reshaped_dim)
         # print('x shape : ', x.shape)  # torch.Size([6, 5, 10])
