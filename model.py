@@ -34,7 +34,7 @@ class ContextualizedNN(nn.Module):
         # 근데, 이 형태로는 target 이랑 사이즈가 안 맞음 !
         # [batch_size, factor_size=5, final_dim=1]
         # loss 계산할 때, 조절하면 됨 ! DONE
-        return result
+        return torch.mean(result, dim=1).squeeze()
 
 
 if __name__ == '__main__':
