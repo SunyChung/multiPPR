@@ -27,7 +27,7 @@ class ContextualizedNN(nn.Module):
         # print('user_rep shape : ', user_rep.shape)  # torch.Size([batch_size, 5, 10])
         item_rep = self.item_rep(torch.LongTensor(item_idxs).to(self.device))
         # print('item_rep shape : ', item_rep.shape)  # torch.Size([batch_size, 5, 10])
-        interaction = item_rep * user_rep
+        interaction = item_rep * user_rep.to(self.device)
         # print('interaction shape : ', interaction.shape)  # torch.Size([batch_size, 5, 10])
         result = torch.sigmoid(self.inter_lin(interaction)).to(self.device)
         # print('result shape : ', result.shape)  # torch.Size([batch_size, 5, 1])
