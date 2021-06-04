@@ -10,16 +10,16 @@ class LinearRep(nn.Module):
         self.multi_factor = multi_factor
         self.reshaped_dim = output_dim // multi_factor
         # print('reshaped_dim : ', self.reshaped_dim)  # 10
-        self.id_emb = id_emb
-        self.scr_emb = scr_emb
+        self.id_emb = id_emb.to(self.device)
+        self.scr_emb = scr_emb.to(self.device)
 
         self.ln1 = nn.Linear(input_dim, input_dim)
         self.ln2 = nn.Linear(input_dim, hidden_dim)
         self.ln3 = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, index):
-        x = self.ln1(self.id_emb(torch.LongTensor(index))).to(self.device)
-        x = torch.mul(x, self.scr_emb(torch.LongTensor(index))).to(self.device)
+        x = self.ln1(self.id_emb(torch.LongTensor(index)).to(self.device))
+        x = torch.mul(x, self.scr_emb(torch.LongTensor(index)).to(self.device))
         x = self.ln2(x)
         x = self.ln3(x).reshape(-1, self.multi_factor, self.reshaped_dim)
         # print('x shape : ', x.shape)  # torch.Size([6, 5, 10])
