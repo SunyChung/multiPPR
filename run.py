@@ -124,7 +124,7 @@ def test(test_coords, test_values):
         prediction = model(user_idx, item_idx)
         reshaped_pred = torch.mean(prediction, dim=1).squeeze()
         targets = torch.Tensor(test_values[idxlist[st_idx:end_idx]]).to(device)
-        test_loss = loss(reshaped_pred, targets)
+        test_loss = loss(reshaped_pred, targets.to(device))
         loss_list.append(test_loss.detach())
     return loss_list
 
