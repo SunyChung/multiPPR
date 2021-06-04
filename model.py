@@ -23,9 +23,9 @@ class ContextualizedNN(nn.Module):
         self.inter_lin = nn.Linear(self.inter_input_dim, final_dim).to(self.device)
 
     def forward(self, user_idxs, item_idxs):
-        user_rep = self.user_rep(user_idxs)
+        user_rep = self.user_rep(torch.LongTensor(user_idxs).to(self.device))
         # print('user_rep shape : ', user_rep.shape)  # torch.Size([batch_size, 5, 10])
-        item_rep = self.item_rep(item_idxs)
+        item_rep = self.item_rep(torch.LongTensor(item_idxs).to(self.device))
         # print('item_rep shape : ', item_rep.shape)  # torch.Size([batch_size, 5, 10])
         interaction = item_rep * user_rep
         # print('interaction shape : ', interaction.shape)  # torch.Size([batch_size, 5, 10])
