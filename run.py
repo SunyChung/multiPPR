@@ -92,8 +92,10 @@ def train(epoch, train_coords, train_values):
         predictions = model(user_idxs, item_idxs)
         # reshaped_pred = torch.mean(predictions, dim=1).squeeze()
         targets = torch.Tensor(train_values[idxlist[st_idx:end_idx]])
-
-        train_loss = loss(predictions.detach(), targets)
+        
+        print('predictions : ', predictions.get_device())
+        print('targets : ', targets.get_device())
+        train_loss = loss(predictions, targets)
         loss_list.append(train_loss.detach().item())
         train_loss.backward()
         optimizer.step()
