@@ -15,7 +15,7 @@ class LinearRep(nn.Module):
         self.scr_emb = scr_emb.to(self.device)
 
         self.ln1 = nn.Linear(input_dim, input_dim).to(self.device)
-        self.ln2 = nn.Linear(input_dim, hidden_dim.to(self.device)
+        self.ln2 = nn.Linear(input_dim, hidden_dim).to(self.device)
         self.ln3 = nn.Linear(hidden_dim, output_dim).to(self.device)
 
     def forward(self, index):
