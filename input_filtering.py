@@ -14,6 +14,8 @@ def get_count(tp, id):
 def filter_triplets(tp, min_sc=0, min_uc=5):
     if min_sc > 0:
         item_count = get_count(tp, 'movieId')
+        # depending on the pandas version the below ['size'] returns error message !
+        # this works for pandas = 1.1.2 or later versions
         tp = tp[tp['movieId'].isin(item_count.index[item_count['size'] >= min_sc])]
         print('movieId filtered !')
 
