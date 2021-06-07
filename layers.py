@@ -10,7 +10,6 @@ class LinearRep(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.multi_factor = multi_factor
         self.reshaped_dim = output_dim // multi_factor
-        # print('reshaped_dim : ', self.reshaped_dim)  # 10
         self.id_emb = id_emb.to(self.device)
         self.scr_emb = scr_emb.to(self.device)
 
@@ -23,7 +22,6 @@ class LinearRep(nn.Module):
         x = torch.mul(x, self.scr_emb(index))
         x = self.ln2(x)
         x = self.ln3(x).reshape(-1, self.multi_factor, self.reshaped_dim)
-        # print('x shape : ', x.shape)  # torch.Size([6, 5, 10])
         return x
 
 
@@ -35,12 +33,8 @@ class PPRfeatures(object):
         self.ppr_scores = np.array(list(ppr_dict.values()))
 
     def idx_embeds(self):
-        # multi-PPR doesn't filtered the first PPR node
-        # check before remove it from the list !
-        # SHOULD the 1st idx be the target id itself,
-        # check before move on to the next step !
-        # idx_top_k = self.idx_values[:self.top_k, :, :]
-        idx_top_k = self.idx_values[1:self.top_k, :, :]
+        # dictionary shape : [all nodes idxs , multi-factors, ranked idxs]
+        idx_top_k = self.idx_values[:, :, 1:self.top_k+1]
         idx_emb = nn.Embedding(idx_top_k.shape[0], idx_top_k.shape[1]*idx_top_k.shape[2])
         print('idx_emb shape : ', idx_emb)
         idx_emb.weight = nn.Parameter(torch.Tensor(idx_top_k.reshape(idx_top_k.shape[0], -1)))
@@ -48,10 +42,8 @@ class PPRfeatures(object):
         return idx_emb
 
     def score_embeds(self):
-        # multi-PPR doesn't filtered the first PPR node
-        # check before remove it from the list !
-        # score_top_k = self.ppr_scores[:self.top_k, :, :]
-        score_top_k = self.ppr_scores[1:self.top_k, :, :]
+        # dictionary shape : [all nodes idxs, multi-factors, ranked scores]
+        score_top_k = self.ppr_scores[:, :, 1:self.top_k+1]
         score_emb = nn.Embedding(score_top_k.shape[0], score_top_k.shape[1]*score_top_k.shape[2])
         print('score_emb shape : ', score_emb)
         score_emb.weight = nn.Parameter(torch.Tensor(score_top_k.reshape(score_top_k.shape[0], -1)))
