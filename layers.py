@@ -39,8 +39,8 @@ class PPRfeatures(object):
         # check before remove it from the list !
         # SHOULD the 1st idx be the target id itself,
         # check before move on to the next step !
-        # idx_top_k = self.idx_values[:, :, 1:self.top_k]
-        idx_top_k = self.idx_values[:, :, :self.top_k]
+        # idx_top_k = self.idx_values[:self.top_k, :, :]
+        idx_top_k = self.idx_values[1:self.top_k, :, :]
         idx_emb = nn.Embedding(idx_top_k.shape[0], idx_top_k.shape[1]*idx_top_k.shape[2])
         print('idx_emb shape : ', idx_emb)
         idx_emb.weight = nn.Parameter(torch.Tensor(idx_top_k.reshape(idx_top_k.shape[0], -1)))
@@ -50,8 +50,8 @@ class PPRfeatures(object):
     def score_embeds(self):
         # multi-PPR doesn't filtered the first PPR node
         # check before remove it from the list !
-        # score_top_k = self.ppr_scores[:, :, 1:self.top_k]
-        score_top_k = self.ppr_scores[:, :, :self.top_k]
+        # score_top_k = self.ppr_scores[:self.top_k, :, :]
+        score_top_k = self.ppr_scores[1:self.top_k, :, :]
         score_emb = nn.Embedding(score_top_k.shape[0], score_top_k.shape[1]*score_top_k.shape[2])
         print('score_emb shape : ', score_emb)
         score_emb.weight = nn.Parameter(torch.Tensor(score_top_k.reshape(score_top_k.shape[0], -1)))
