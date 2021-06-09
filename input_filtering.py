@@ -45,7 +45,7 @@ def data_filtering(data_dir, raw_data):
 def split_train_test_proportion(data, test_prop):
     data_grouped_by_user = data.groupby('userId')
     tr_list, te_list = [], []
-    np.random.seed(1234)
+    np.random.seed(1324)
 
     for i, (_, group) in enumerate(data_grouped_by_user):
         n_items_u = len(group)
@@ -56,12 +56,9 @@ def split_train_test_proportion(data, test_prop):
             te_list.append(group[idx])
         else:
             tr_list.append(group)
-
-        '''
         if i % 100 == 0:
             print('%d users sampled' %i)
             sys.stdout.flush()
-        '''
     data_tr = pd.concat(tr_list)
     data_te = pd.concat(te_list)
     return data_tr, data_te
@@ -104,7 +101,7 @@ if __name__ == '__main__':
         pickle.dump(uid_to_uidx, f)
     ######################### userId - idx mapping #############################
 
-    np.random.seed(1234)
+    np.random.seed(1324)
     idx_perm = np.random.permutation(unique_uidx.size)
     unique_uidx = unique_uidx[idx_perm]
 
@@ -143,9 +140,9 @@ if __name__ == '__main__':
     vad_plays = vad_plays.loc[vad_plays['movieId'].isin(train_sid)]
     vad_plays_tr, vad_plays_te = split_train_test_proportion(vad_plays, test_prop)
     vad_data_tr = numbered(vad_plays_tr, sid_to_sidx, uid_to_uidx)
-    vad_data_te = numbered(vad_plays_tr, sid_to_sidx, uid_to_uidx)
-    # print(vad_data_tr)
-    # print(vad_data_te)
+    vad_data_te = numbered(vad_plays_te, sid_to_sidx, uid_to_uidx)
+    print(vad_data_tr)
+    print(vad_data_te)
     vad_data_tr.to_csv(os.path.join(data_dir, 'vad_tr.csv'), index=False)
     vad_data_te.to_csv(os.path.join(data_dir, 'vad_te.csv'), index=False)
 
@@ -154,7 +151,7 @@ if __name__ == '__main__':
     test_plays_tr, test_plays_te = split_train_test_proportion(test_plays, test_prop)
     test_data_tr = numbered(test_plays_tr, sid_to_sidx, uid_to_uidx)
     test_data_te = numbered(test_plays_te, sid_to_sidx, uid_to_uidx)
-    # print(test_data_tr)
-    # print(test_data_te)
+    print(test_data_tr)
+    print(test_data_te)
     test_data_tr.to_csv(os.path.join(data_dir, 'test_tr.csv'), index=False)
     test_data_te.to_csv(os.path.join(data_dir, 'test_te.csv'), index=False)
