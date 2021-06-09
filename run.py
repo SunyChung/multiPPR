@@ -115,7 +115,12 @@ def train(epoch, train_coords, train_values, vad_te_coords, vad_te_values):
         item_idxs = vad_te_coords[vad_idxlist[st_idx:end_idx]][:, 1]
 
         predictions = model(user_idxs, item_idxs)
-        ndcg_list.append(NDCG(predictions, vad_te_values[vad_idxlist[st_idx:end_idx]]))
+        # 근데, 여기서 문제는 .detach().numpy() or .to('cpu') 이런 게 아니고,
+        # prediction 결과값으로 NDCG 계산이 안 된다는 거 아닌가 ;;
+        # 여기서의 prediction 은 user 랑 item prbiability 인데,
+        # NDCG 는 item ranking 이 필요함...
+        # 그냥 코드 돌리지 말고, 먼저, 각 user 별로 item ranking 뽑을 방법 찾기 !
+        ndcg_list.append(NDCG(predictions.detach().numpy(), vad_te_values[vad_idxlist[st_idx:end_idx]]))
     ndcg_list = np.concatenate(ndcg_list)
     ndcg = ndcg_list.mean()
     print('epoch : {:04d}'.format(epoch),
@@ -146,9 +151,9 @@ def evaluate(test_te_coords, test_te_values):
 
         predictions = model(user_idx, item_idx)
         targets = torch.Tensor(test_te_values[idxlist[st_idx:end_idx]])
-        recall_score = RECALL(predictions, targets)
+        recall_score = RECALL(predictions.detach().numpy(), targets)
         recall_list.append(recall_score)
-        ndcg_score = NDCG(predictions, targets)
+        ndcg_score = NDCG(predictions.detach().numpy(), targets)
         ndcg_list.append(ndcg_score)
         test_loss = loss(predictions.to('cpu'), targets)
         loss_list.append(test_loss.detach())
