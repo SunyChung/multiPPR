@@ -106,27 +106,24 @@ def train(epoch, train_coords, train_values, vad_te_coords, vad_te_values):
         optimizer.step()
 
     # for validation only validation user idx is needed
-    # evaluation is done by comparing the actual item sequence with prediction using embedding values
-    ndcg_cos_list = []
-    ndcg_cdist_list = []
-    # 근데 여기서는 pariwise 로 coordinate 를 만들어서, user_idx 중복이 많음 ...
-    # validation, test 에서는 batch 하지 말고, 그냥 user id 추출해서 테스트 하는 게 나을 듯
+    model.eval()
+    ndcg_list = []
     vad_row, vad_col = vad_data_te.nonzero()
     uniq_vad_users = np.unique(vad_row)
     for i in enumerate(range(uniq_vad_users)):
-        cos_item_pred, cdist_item_pred = item_rank.calculate(uniq_vad_users[i])
-        user_items = [j for j in range(len(vad_data_te.toarray()[uniq_vad_users[i]]))
-                      if vad_data_te.toarray()[uniq_vad_users[i]][j] == 1]
-        # 예측값 : cos_item_pred, cdist_item_pred , 각 사용자별 item 정답 : user_items
-        ndcg_cos_list.append(ndcg(user_items, cos_item_pred, len(user_items)))
-        ndcg_cdist_list.append(ndcg(user_items, cdist_item_pred, len(user_items)))
-    ndcg_cos_list = np.concatenate(ndcg_cos_list)
-    ndcg_cdist_list = np.concatenate((ndcg_cdist_list))
-    ndcg_cos = ndcg_cos_list.mean()
-    ndcg_cdist = ndcg_cdist_list.mean()
+        target_user = uniq_vad_users[i]
+        user_items = [j for j in range(len(vad_data_te.toarray()[target_user]))
+                      if vad_data_te.toarray()[target_user][j] == 1]
+
+        for item_idx in range(n_items):
+            predictions = np.zeros(n_items)
+            predictions[item_idx] = model(target_user, item_idx)
+        ndcg_list.append(ndcg(predictions, user_items))
+    ndcg_list = np.concatenate(ndcg_list)
+    ndcg = ndcg_list.mean()
     print('epoch : {:04d}'.format(epoch),
           '\ntime : {:.4f}s'.format(time.time() - start))
-    return ndcg_cos, ndcg_cdist
+    return ndcg
 
 
 for epoch in range(epochs):
@@ -135,8 +132,6 @@ for epoch in range(epochs):
     print('distance-based NDCG : ', ndcg_cdist)
 
 
-# 근데, 이렇게 되면, 예측이 너무 뻔해지는데;;
-# 그냥 1 로 다 찍으면 끝나는 거 아닌가 ? ......
 def evaluate(test_te_coords, test_te_values):
     test_n = len(test_te_coords)
     idxlist = list(range(test_n))
