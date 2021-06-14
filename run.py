@@ -20,10 +20,10 @@ parser.add_argument('--epochs', type=int, default=20)
 parser.add_argument('--multi_factor', type=int, default=5)
 parser.add_argument('--top_k', type=int, default=20)
 parser.add_argument('--emb_dim', type=int, default=100)
-parser.add_argument('--input_dim', type=int, default=20, help='top_k x multi_factor')
-parser.add_argument('--hidden_dim', type=int, default=100)
-parser.add_argument('--output_dim', type=int, default=10)
-parser.add_argument('--final_dim', type=int, default=1)
+# parser.add_argument('--input_dim', type=int, default=20, help='top_k x multi_factor')
+# parser.add_argument('--hidden_dim', type=int, default=100)
+# parser.add_argument('--output_dim', type=int, default=10)
+# parser.add_argument('--final_dim', type=int, default=1)
 
 args = parser.parse_args()
 data_dir = args.data_dir
@@ -66,6 +66,7 @@ del user_ppr_dict
 # for user embedding size
 with open(os.path.join(data_dir, 'unique_uidx'), 'rb') as f:
     unique_uidx = pickle.load(f)
+
 n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te = load_data(data_dir)
 item_embedding = nn.Embedding(n_items, emb_dim)
 user_embedding = nn.Embedding(len(unique_uidx), emb_dim)
@@ -73,21 +74,19 @@ user_embedding = nn.Embedding(len(unique_uidx), emb_dim)
 model = ContextualizedNN(item_idx_tensor, item_scr_tensor, user_idx_tensor, user_scr_tensor,
                          item_embedding, user_embedding).to(device)
 print(model)
+model_best = ContextualizedNN(item_idx_tensor, item_scr_tensor, user_idx_tensor, user_scr_tensor,
+                         item_embedding, user_embedding).to(device)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-train_coords, train_values, _ = get_sparse_coord_value_shape(train_data)
-vad_tr_coords, vad_trv_values, _ = get_sparse_coord_value_shape(vad_data_tr)
-vad_te_coords, vad_te_values, _ = get_sparse_coord_value_shape(vad_data_te)
-# print(train_coords.shape)  # (480722, 2)
-item_rank = ItemRanking(user_embedding, item_embedding, top_k=100)
 
-
-def train(epoch, train_coords, train_values, vad_te_coords, vad_te_values):
+def train(epoch, train_input, valid_input):
     print('epoch : ', epoch)
     start = time.time()
 
+    train_coords, train_values, _ = get_sparse_coord_value_shape(train_input)
+    # print(train_coords.shape)  # (480722, 2)
     train_n = len(train_coords)
     train_idxlist = list(range(train_n))
     model.train()
@@ -104,62 +103,50 @@ def train(epoch, train_coords, train_values, vad_te_coords, vad_te_values):
         train_loss = loss(predictions.to('cpu'), targets)
         train_loss.backward()
         optimizer.step()
-
-    # for validation only validation user idx is needed
-    model.eval()
-    ndcg_list = []
-    vad_row, vad_col = vad_data_te.nonzero()
-    uniq_vad_users = np.unique(vad_row)
-    for i in enumerate(range(uniq_vad_users)):
-        target_user = uniq_vad_users[i]
-        user_items = [j for j in range(len(vad_data_te.toarray()[target_user]))
-                      if vad_data_te.toarray()[target_user][j] == 1]
-
-        for item_idx in range(n_items):
-            predictions = np.zeros(n_items)
-            predictions[item_idx] = model(target_user, item_idx)
-        ndcg_list.append(ndcg(predictions, user_items))
-    ndcg_list = np.concatenate(ndcg_list)
-    ndcg = ndcg_list.mean()
-    print('epoch : {:04d}'.format(epoch),
-          '\ntime : {:.4f}s'.format(time.time() - start))
-    return ndcg
+    # evaluation with train data set
+    recall_list, ndcg_list, loss_list = evaluate(valid_input)
+    return recall_list, ndcg_list, loss_list
 
 
 for epoch in range(epochs):
-    ndcg_cos, ndcg_cdist = train(epoch, train_coords, train_values, vad_te_coords, vad_te_values)
-    print('cosine-based NDCG : ', ndcg_cos)
-    print('distance-based NDCG : ', ndcg_cdist)
+    recall_list, ndcg_list, loss_list = train(epoch, train_data, train_data)
+    print('returned recall :', np.mean(recall_list))
+    print('returned NDCG : ', np.mean(ndcg_list))
+    print('returned mean loss : ', np.mean(loss_list))
 
 
-def evaluate(test_te_coords, test_te_values):
-    test_n = len(test_te_coords)
-    idxlist = list(range(test_n))
+def evaluate(test_input):
     model.eval()
+    row, col = test_input.nonzero()
+    uniq_users = np.unique(row)
+    uniq_items = np.unique(col)
+    input_array = test_input.toarray()
     loss = nn.BCELoss()
     loss_list = []
     recall_list = []
     ndcg_list = []
-    for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
-        print('batch_num : ', batch_num)
-        end_idx = min(st_idx + batch_size, test_n)
-        user_idx = test_te_coords[idxlist[st_idx:end_idx]][:, 0]
-        item_idx = test_te_coords[idxlist[st_idx:end_idx]][:, 1]
+    for i in enumerate(range(uniq_users)):
+        target_user = uniq_users[i]
+        # target user 가 선택한 item 만 뽑으면 안 되고, user sequence 를 추출해야 함!
+        # 다시 보니 user 가 선택한 것만 뽑아야 ... 근데, 이건 정렬 안 하나?
+        # 원래 np.where(조건문, 참인 경우, 거짓인 경우) 로 처리하기 때문에
+        # 반환되는 값이 tuple 이 됨. [0] 을 선택하면 원하는 index array 만 얻을 수 있음
+        target_user_idxs = np.where(input_array[target_user] == 1)[0]
+        for item_idx in uniq_items:
+            predictions = np.zeros_like(uniq_items)
+            predictions[item_idx] = model(target_user, item_idx).numpy()
 
-        predictions = model(user_idx, item_idx)
-        targets = torch.Tensor(test_te_values[idxlist[st_idx:end_idx]])
-        recall_score = RECALL(predictions.detach().numpy(), targets)
-        recall_list.append(recall_score)
-        ndcg_score = NDCG(predictions.detach().numpy(), targets)
-        ndcg_list.append(ndcg_score)
-        test_loss = loss(predictions.to('cpu'), targets)
-        loss_list.append(test_loss.detach())
+            recall_score = RECALL(predictions, target_user_idxs)
+            recall_list.append(recall_score)
+            ndcg_score = NDCG(predictions, target_user_idxs)
+            ndcg_list.append(ndcg_score)
+            test_loss = loss(predictions, target_user_idxs)
+            loss_list.append(test_loss.detach())
     return recall_list, ndcg_list, loss_list
 
 
 print('test started !')
-test_tr_coords, test_tr_values, _ = get_sparse_coord_value_shape(test_data_tr)
-test_te_coords, test_te_values, _ = get_sparse_coord_value_shape(test_data_te)
-returned_loss = evaluate(test_te_coords, test_te_values)
-print('returned mean loss : ', np.mean(returned_loss))
-print('returned recall :')
+recall_list, ndcg_list, loss_list = evaluate(test_data_te)
+print('returned recall :', np.mean(recall_list))
+print('returned NDCG : ', np.mean(ndcg_list))
+print('returned mean loss : ', np.mean(loss_list))
