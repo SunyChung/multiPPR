@@ -79,6 +79,7 @@ print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
+'''
 def evaluate(test_input):
     model.eval()
     row, col = test_input.nonzero()
@@ -91,7 +92,7 @@ def evaluate(test_input):
     ndcg_list = []
     for i in range(len(uniq_users)):
         target_user = uniq_users[i]
-        print('target_user : ', target_user)
+        # print('target_user : ', target_user)
         target_user_idxs = np.where(input_array[target_user, :] == 1)[0]
         predictions = np.zeros(max(uniq_items))
         for j in range(len(uniq_items)):
@@ -99,7 +100,9 @@ def evaluate(test_input):
             # print('model output : ', result_check)  # 1.0
             # print('model shape : ', result_check.shape)  # ()
             predictions[j] = model(target_user, uniq_items[j]).detach().cpu().numpy()
-        print('predictions : ', predictions)
+        # print('predictions : ', predictions)
+        # 이것도 batch 로 할 수 있으면, batch 로 !! 해야 할 듯. cpu 로 옮기고 나니 넘 느림
+        # user 하나씩 한 땀 한 땀 정성스레 하고 있;;
         recall_score = RECALL(predictions, target_user_idxs, k=20)
         recall_list.append(recall_score)
         ndcg_score = NDCG(predictions, target_user_idxs, k=20)
@@ -109,6 +112,25 @@ def evaluate(test_input):
         # loss_list 지워도 됨
         # test_loss = loss(predictions, target_user_idxs)
         # loss_list.append(test_loss.detach())
+    return recall_list, ndcg_list
+'''
+
+
+def evaluate(test_input):
+    model.eval()
+    row, col = test_input.nonzero()
+    uniq_users = np.unique(row)
+    uniq_items = np.unique(col)
+    input_array = test_input.toarray()
+    recall_list = []
+    ndcg_list = []
+    for i in range(len(uniq_users)):
+        predictions = model(np.repeat(uniq_users[i], len(uniq_items)), uniq_items).detach().cpu().numpy()
+        target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
+        recall_score = RECALL(predictions, target_user_items)
+        recall_list.append(recall_score)
+        ndcg_score = NDCG(predictions, target_user_items)
+        ndcg_list.append(ndcg_score)
     return recall_list, ndcg_list
 
 
