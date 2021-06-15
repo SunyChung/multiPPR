@@ -138,20 +138,26 @@ if __name__ == '__main__':
 
     vad_plays = filtered_pd.loc[filtered_pd['userId'].isin(vd_users)]
     vad_plays = vad_plays.loc[vad_plays['movieId'].isin(train_sid)]
+    vad_data = numbered(vad_plays, sid_to_sidx, uid_to_uidx)
+    vad_data.to_csv(os.path.join(data_dir, 'vad.csv'), index=False)
+
     vad_plays_tr, vad_plays_te = split_train_test_proportion(vad_plays, test_prop)
     vad_data_tr = numbered(vad_plays_tr, sid_to_sidx, uid_to_uidx)
     vad_data_te = numbered(vad_plays_te, sid_to_sidx, uid_to_uidx)
-    print(vad_data_tr)
-    print(vad_data_te)
+    # print(vad_data_tr)
+    # print(vad_data_te)
     vad_data_tr.to_csv(os.path.join(data_dir, 'vad_tr.csv'), index=False)
     vad_data_te.to_csv(os.path.join(data_dir, 'vad_te.csv'), index=False)
 
     test_plays = filtered_pd.loc[filtered_pd['userId'].isin(te_users)]
     test_plays = test_plays.loc[test_plays['movieId'].isin(train_sid)]
+    test_data = numbered(test_plays, sid_to_sidx, uid_to_uidx)
+    test_data.to_csv(os.path.join(data_dir, 'test.csv'), index=False)
+
     test_plays_tr, test_plays_te = split_train_test_proportion(test_plays, test_prop)
     test_data_tr = numbered(test_plays_tr, sid_to_sidx, uid_to_uidx)
     test_data_te = numbered(test_plays_te, sid_to_sidx, uid_to_uidx)
-    print(test_data_tr)
-    print(test_data_te)
+    # print(test_data_tr)
+    # print(test_data_te)
     test_data_tr.to_csv(os.path.join(data_dir, 'test_tr.csv'), index=False)
     test_data_te.to_csv(os.path.join(data_dir, 'test_te.csv'), index=False)
