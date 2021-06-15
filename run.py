@@ -127,9 +127,9 @@ def evaluate(test_input):
     for i in range(len(uniq_users)):
         predictions = model(np.repeat(uniq_users[i], len(uniq_items)), uniq_items).detach().cpu().numpy()
         target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
-        recall_score = RECALL(predictions, target_user_items)
+        recall_score = RECALL(predictions, target_user_items, k=100)
         recall_list.append(recall_score)
-        ndcg_score = NDCG(predictions, target_user_items)
+        ndcg_score = NDCG(predictions, target_user_items, k=100)
         ndcg_list.append(ndcg_score)
     return recall_list, ndcg_list
 
