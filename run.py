@@ -74,8 +74,6 @@ user_embedding = nn.Embedding(len(unique_uidx), emb_dim)
 model = ContextualizedNN(item_idx_tensor, item_scr_tensor, user_idx_tensor, user_scr_tensor,
                          item_embedding, user_embedding).to(device)
 print(model)
-model_best = ContextualizedNN(item_idx_tensor, item_scr_tensor, user_idx_tensor, user_scr_tensor,
-                         item_embedding, user_embedding).to(device)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -96,7 +94,7 @@ def evaluate(test_input):
         target_user_idxs = np.where(input_array[target_user, :] == 1)[0]
         for item_idx in uniq_items:
             predictions = np.zeros_like(uniq_items)
-            predictions[item_idx] = model(target_user, item_idx).numpy()
+            predictions[item_idx] = model(target_user, item_idx).detach().numpy()
 
             recall_score = RECALL(predictions, target_user_idxs, k=20)
             recall_list.append(recall_score)
