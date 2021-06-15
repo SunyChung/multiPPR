@@ -8,9 +8,6 @@ from sknetwork.ranking import PageRank
 import os
 import time
 import bottleneck as bn
-import torch
-import torch.nn as nn
-from numpy.linalg import norm as norm
 
 
 def get_bipartite_matrix(data_dir):
@@ -57,29 +54,6 @@ def get_user_matrix(data_dir):
     bi_matrix = get_bipartite_matrix(data_dir)
     user_matrix = bi_matrix * bi_matrix.transpose()
     return user_matrix
-
-'''
-# user 를 items sequence 로 사용하지 않아서 이거 없어도 됨 !
-# 이것도 index 로 mapping 시켜야 되나 ?? YES !!!
-def get_user_sequences(data_dir):
-    df = pd.read_csv(os.path.join(data_dir, 'filtered_ratings.csv'))
-    with open(os.path.join(data_dir, 'uid_to_uidx.dict'), 'rb') as f:
-        uid_to_uidx = pickle.load(f)
-    with open(os.path.join(data_dir, 'mid_to_midx.dict'), 'rb') as f:
-        mid_to_midx = pickle.load(f)
-
-    df['userId'] = df['userId'].map(uid_to_uidx)
-    df['movieId'] = df['movieId'].map(mid_to_midx)
-    df_array = df.to_numpy()
-    user_array = df['userId'].unique()
-    per_user_item_dict = {}
-    for i in user_array:
-        per_user_item_dict[i] = df_array[np.where(df_array[:, 0] == i)][:, 1]
-    return user_array, per_user_item_dict
-    # print(max(per_user_item_indices))  # 1435
-    # print(min(per_user_item_indices))  # 1
-    # print(np.mean(per_user_item_indices))  # 95.26579340076273
-'''
 
 
 # train, validation, test data 는 모두 index 값으로 mapping 된 상태 !
@@ -132,6 +106,24 @@ def load_data(data_dir):
     return n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te
 
 
+def load_vad_test_data(csv_file, n_items):
+    df = pd.read_csv(csv_file)
+    n_users = df['uid'].max() + 1
+    rows, cols = df['uid'].to_numpy(), df['sid'].to_numpy()
+    data = sparse.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float64', shape=(n_users, n_items))
+    return data
+
+
+def load_all(data_dir):
+    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
+        train_sid = pickle.load(f)
+    n_items = len(train_sid)
+    train_data = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
+    vad_data = load_vad_test_data(os.path.join(data_dir, 'vad.csv'), n_items)
+    test_data = load_vad_test_data(os.path.join(data_dir, 'test.csv'), n_items)
+    return n_items, train_data, vad_data, test_data
+
+
 def get_sparse_coord_value_shape(sparse_mat):
     if not isspmatrix_coo(sparse_mat):
         sparse_mat = sparse_mat.tocoo()
@@ -164,80 +156,24 @@ class MultiPPR(object):
         return np.array(multi_score), np.array(indices)
 
 
-def ndcg(pred_rel, true_rel, k):
-    topk_pred = pred_rel[:, :k]
-    discount = 1 / np.log2(np.arange(2, k + 2))
-    idcg = np.sum(true_rel * discount)
-    dcg = np.sum(pred_rel * discount)
+def NDCG(pred_rel, item_idxs, k):
+    topk_idx = np.argsort(pred_rel)[::-1][:k]
+    topk_pred = pred_rel[topk_idx]
+    dcg = np.array([topk_pred[i] / np.log2(topk_idx[i] + 2) for i in range(len(topk_idx))]).sum()
+    # what if the true item index list is shorter than the prediction list ?!
+    idcg = np.array([1 / np.log2(item_idxs[min(j, k)] + 2) for j in range(len(item_idxs))]).sum()
     return dcg / idcg
 
 
-def ndcg(X_pred, heldout_batch, k=100):
-    '''
-    normalized discounted cumulative gain@k for binary relevance
-    ASSUMPTIONS: all the 0's in heldout_data indicate 0 relevance
-    '''
-    batch_users = X_pred.shape[0]
-    idx_topk_part = bn.argpartition(-X_pred, k, axis=1)
-    topk_part = X_pred[np.arange(batch_users)[:, np.newaxis],
-                       idx_topk_part[:, :k]]
-    idx_part = np.argsort(-topk_part, axis=1)
-    # X_pred[np.arange(batch_users)[:, np.newaxis], idx_topk] is the sorted
-    # topk predicted score
-    idx_topk = idx_topk_part[np.arange(batch_users)[:, np.newaxis], idx_part]
-    # build the discount template
-    tp = 1. / np.log2(np.arange(2, k + 2))
-
-    DCG = (heldout_batch[np.arange(batch_users)[:, np.newaxis],
-                         idx_topk].toarray() * tp).sum(axis=1)
-    IDCG = np.array([(tp[:min(n, k)]).sum()
-                     for n in heldout_batch.getnnz(axis=1)])
-    return DCG / IDCG
-
-
-def RECALL(X_pred, heldout_batch, k=100):
-    batch_users = X_pred.shape[0]
-    idx = bn.argpartition(-X_pred, k, axis=1)
-
-    X_pred_binary = np.zeros_like(X_pred, dtype=bool)
-    X_pred_binary[np.arange(batch_users)[:, np.newaxis], idx[:, :k]] = True
-    X_true_binary = (heldout_batch > 0).toarray()
-    tmp = (np.logical_and(X_true_binary, X_pred_binary).sum(axis=1)).astype(np.float32)
-    recall = tmp / np.minimum(k, X_true_binary.sum(axis=1))
+def RECALL(pred_rel, item_idx, k):
+    topk_idx = np.argsort(pred_rel)[::-1][:k]
+    pred_binary = np.zeros_like(pred_rel, dtype=bool)
+    pred_binary[topk_idx] = True
+    true_binary = np.zeros_like(pred_rel, dtype=bool)
+    true_binary[item_idx] = True
+    tmp = (np.logical_and(pred_binary, true_binary).sum()).astype(np.float32)
+    recall = tmp / np.minimum(k, true_binary.sum())
     return recall
-
-
-class ItemRanking(object):
-    def __init__(self, user_embedding, item_embedding, top_k):
-        self.user_embedding = user_embedding
-        self.item_embedding = item_embedding
-        self.top_k = top_k
-
-    def calculate(self, user_idx):
-        target_emb = self.user_embedding(torch.LongTensor(user_idx))
-        # CosineSimilarity 는 두 개의 input shape 이 동일해야 함...
-        cos_sim = nn.CosineSimilarity(dim=1, eps=1e-6)
-        cos_list = []
-        cd_list = []
-        for i in range(self.item_embedding.num_embeddings):
-            i_emb = self.item_embedding(torch.LongTensor([i]))
-            # 굳이 detach() 안 해도 torch 에서도 sorting 가능
-            # 단, torch 는 tensor 만 데이터로 다루기 때문에, list 를 tensor 처리해야 함
-            cos_list.append(cos_sim(target_emb, i_emb).detach().numpy())
-            cd_list.append(torch.cdist(target_emb, i_emb).detach().numpy())
-            # detach().numpy() 안 하고, torch tensor 에서 처리하려면 ?
-            # 근데, 굳이 그럴 필요가 ?
-        # 근데, 예제로 구하고 보니, cosine 이랑 cdist 랑 가까운 node 가 완전 다른데 -_;;
-        # NDCG 비교하려면, 원래 데이터랑, 예측 데이터 둘 다, relevance score 있어야 함
-        # 그러고보니 index 정렬 안 해도 되는 ??
-        # cos_index_tensors = torch.argsort(torch.Tensor(cos_list))
-        # cos_values = cos_list[cos_index_tensors]
-        # cd_index_tensors = torch.argsort(torch.Tensor(cd_list))
-        # cd_values = cd_list[cd_index_tensors]
-        # return cos_index_tensors[:self.top_k], cd_index_tensors[:self.top_k]
-        normed_cos = cos_list / norm(cos_list)
-        normed_cdist = cd_list / norm(cd_list)
-        return normed_cos, normed_cdist
 
 
 if __name__ == '__main__':
