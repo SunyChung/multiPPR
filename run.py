@@ -116,7 +116,7 @@ def evaluate(test_input):
 '''
 
 
-def evaluate(test_input):
+def evaluate(test_input, n_items):
     model.eval()
     row, col = test_input.nonzero()
     uniq_users = np.unique(row)
@@ -125,7 +125,7 @@ def evaluate(test_input):
     recall_list = []
     ndcg_list = []
     for i in range(len(uniq_users)):
-        predictions = model(np.repeat(uniq_users[i], len(uniq_items)), uniq_items).detach().cpu().numpy()
+        predictions = model(np.repeat(uniq_users[i], len(n_items)), n_items).detach().cpu().numpy()
         target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
         recall_score = RECALL(predictions, target_user_items, k=100)
         recall_list.append(recall_score)
