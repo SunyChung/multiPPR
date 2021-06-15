@@ -158,7 +158,7 @@ def train(epoch, train_input, valid_input):
         optimizer.step()
     print('one epoch training takes : ', time.time() - start)
     # evaluation with train data set
-    recall_list, ndcg_list = evaluate(valid_input)
+    recall_list, ndcg_list = evaluate(valid_input, n_items)
     return recall_list, ndcg_list
 
 
@@ -169,6 +169,6 @@ for epoch in range(epochs):
 
 
 print('test started !')
-recall_list, ndcg_list = evaluate(test_data)
+recall_list, ndcg_list = evaluate(test_data, n_items)
 print('returned recall :', np.mean(recall_list))
 print('returned NDCG : ', np.mean(ndcg_list))
