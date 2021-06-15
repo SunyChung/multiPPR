@@ -67,7 +67,7 @@ del user_ppr_dict
 with open(os.path.join(data_dir, 'unique_uidx'), 'rb') as f:
     unique_uidx = pickle.load(f)
 
-n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te = load_data(data_dir)
+n_items, train_data, vad_data, test_data = load_all(data_dir)
 item_embedding = nn.Embedding(n_items, emb_dim)
 user_embedding = nn.Embedding(len(unique_uidx), emb_dim)
 
@@ -81,12 +81,38 @@ print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
+def evaluate(test_input):
+    model.eval()
+    row, col = test_input.nonzero()
+    uniq_users = np.unique(row)
+    uniq_items = np.unique(col)
+    input_array = test_input.toarray()
+    loss = nn.BCELoss()
+    loss_list = []
+    recall_list = []
+    ndcg_list = []
+    for i in range(len(uniq_users)):
+        target_user = uniq_users[i]
+        target_user_idxs = np.where(input_array[target_user, :] == 1)[0]
+        for item_idx in uniq_items:
+            predictions = np.zeros_like(uniq_items)
+            predictions[item_idx] = model(target_user, item_idx).numpy()
+
+            recall_score = RECALL(predictions, target_user_idxs, k=20)
+            recall_list.append(recall_score)
+            ndcg_score = NDCG(predictions, target_user_idxs, k=20)
+            ndcg_list.append(ndcg_score)
+            test_loss = loss(predictions, target_user_idxs)
+            loss_list.append(test_loss.detach())
+    return recall_list, ndcg_list, loss_list
+
+
 def train(epoch, train_input, valid_input):
     print('epoch : ', epoch)
     start = time.time()
 
     train_coords, train_values, _ = get_sparse_coord_value_shape(train_input)
-    # print(train_coords.shape)  # (480722, 2)
+    # print(train_coords.shape)  # (477497, 2)
     train_n = len(train_coords)
     train_idxlist = list(range(train_n))
     model.train()
@@ -103,50 +129,21 @@ def train(epoch, train_input, valid_input):
         train_loss = loss(predictions.to('cpu'), targets)
         train_loss.backward()
         optimizer.step()
+    print('one epoch training takes : ', time.time() - start)
     # evaluation with train data set
     recall_list, ndcg_list, loss_list = evaluate(valid_input)
     return recall_list, ndcg_list, loss_list
 
 
 for epoch in range(epochs):
-    recall_list, ndcg_list, loss_list = train(epoch, train_data, train_data)
+    recall_list, ndcg_list, loss_list = train(epoch, train_data, vad_data)
     print('returned recall :', np.mean(recall_list))
     print('returned NDCG : ', np.mean(ndcg_list))
     print('returned mean loss : ', np.mean(loss_list))
 
 
-def evaluate(test_input):
-    model.eval()
-    row, col = test_input.nonzero()
-    uniq_users = np.unique(row)
-    uniq_items = np.unique(col)
-    input_array = test_input.toarray()
-    loss = nn.BCELoss()
-    loss_list = []
-    recall_list = []
-    ndcg_list = []
-    for i in enumerate(range(uniq_users)):
-        target_user = uniq_users[i]
-        # target user 가 선택한 item 만 뽑으면 안 되고, user sequence 를 추출해야 함!
-        # 다시 보니 user 가 선택한 것만 뽑아야 ... 근데, 이건 정렬 안 하나?
-        # 원래 np.where(조건문, 참인 경우, 거짓인 경우) 로 처리하기 때문에
-        # 반환되는 값이 tuple 이 됨. [0] 을 선택하면 원하는 index array 만 얻을 수 있음
-        target_user_idxs = np.where(input_array[target_user] == 1)[0]
-        for item_idx in uniq_items:
-            predictions = np.zeros_like(uniq_items)
-            predictions[item_idx] = model(target_user, item_idx).numpy()
-
-            recall_score = RECALL(predictions, target_user_idxs)
-            recall_list.append(recall_score)
-            ndcg_score = NDCG(predictions, target_user_idxs)
-            ndcg_list.append(ndcg_score)
-            test_loss = loss(predictions, target_user_idxs)
-            loss_list.append(test_loss.detach())
-    return recall_list, ndcg_list, loss_list
-
-
 print('test started !')
-recall_list, ndcg_list, loss_list = evaluate(test_data_te)
+recall_list, ndcg_list, loss_list = evaluate(test_data)
 print('returned recall :', np.mean(recall_list))
 print('returned NDCG : ', np.mean(ndcg_list))
 print('returned mean loss : ', np.mean(loss_list))
