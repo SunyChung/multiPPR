@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class ContextualizedNN(nn.Module):
@@ -12,33 +13,30 @@ class ContextualizedNN(nn.Module):
         self.item_scr_tensor = item_scr_tensor.to(self.device)
         self.user_idx_tensor = user_idx_tensor.to(self.device)
         self.user_scr_tensor = user_scr_tensor.to(self.device)
-        self.item_emb = item_embedding.to(self.device)
-        self.user_emb = user_embedding.to(self.device)
+        # emb_dim = 100
+        self.item_emb = item_embedding.to(self.device)  # nn.Embedding(n_items, emb_dim)
+        self.user_emb = user_embedding.to(self.device)  # nn.Embedding(len(unique_uidx), emb_dim)
 
         self.inter_input_dim = self.item_emb.embedding_dim
-        # print('inter_input_dim : ', self.inter_input_dim)
         self.inter_lin = InterLin(input_dim=self.inter_input_dim,
                                   hidden=self.inter_input_dim//10,
                                   output_dim=1)
 
     def forward(self, user_idxs, item_idxs):
         user_neighs = self.user_idx_tensor[user_idxs].to(self.device)
-        # print('user_neighs shape : ', user_neighs.shape)  # [batch_size, 100=(5x20)]
         neigh_emb = self.user_emb(user_neighs).to(self.device)
-        # print('neigh_emb shape : ', neigh_emb.shape)  # [batch_size, 100(=5x20), emb_dim]
         neigh_score = self.user_scr_tensor[user_neighs].to(self.device)
-        # print('neigh_score shape : ', neigh_score.shape)  # [batch_size, 100(=5x20), 100(=5x20)]
         scored_user_emb = torch.matmul(neigh_score, neigh_emb)
-        # print('scored_user_emb shape : ', scored_user_emb.shape)  # torch.Size([500, 100, emb_dim])
 
         item_neighs = self.item_idx_tensor[item_idxs].to(self.device)
         item_neigh_emb = self.item_emb(item_neighs).to(self.device)
         item_neigh_scr = self.item_scr_tensor[item_neighs].to(self.device)
         scored_item_emb = torch.matmul(item_neigh_scr, item_neigh_emb)
 
-        interaction = scored_user_emb * scored_item_emb  # torch.Size([500, 100, emb_dim])
-        # print('interaction shape : ', interaction.shape)
+        interaction = scored_user_emb * scored_item_emb
         result = torch.sigmoid(self.inter_lin(interaction))
+        print('result : ', result)
+        print('result shape : ', result.shape)
         return torch.mean(result, dim=1).squeeze()
 
 
@@ -52,8 +50,10 @@ class InterLin(nn.Module):
 
         self.ln1 = nn.Linear(input_dim, hidden)
         self.ln2 = nn.Linear(hidden, output_dim)
+        self.ln3 = nn.Linear(output_dim, output_dim)
 
     def forward(self, x):
-        x = self.ln1(x)
-        x = self.ln2(x)
+        x = F.relu(self.ln1(x))
+        x = F.relu(self.ln2(x))
+        x = self.ln3(x)
         return x
