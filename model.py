@@ -38,7 +38,6 @@ class ContextualizedNN(nn.Module):
         # print('result shape : ', result.shape)
         # for batch training : torch.Size([500, 100, 1])
         # for one id evaluation : torch.Size([100, 1])
-        print('final result shape : ', torch.mean(result, dim=-2).squeeze().shape())
         return torch.mean(result, dim=-2).squeeze()
 
 
