@@ -37,7 +37,9 @@ class ContextualizedNN(nn.Module):
         result = torch.sigmoid(self.inter_lin(interaction))
         print('result : ', result)
         print('result shape : ', result.shape)
-        return torch.mean(result, dim=1).squeeze()
+        # for batch training : torch.Size([500, 100, 1])
+        # for one id evaluation : torch.Size([100, 1])
+        return torch.mean(result, dim=-2).squeeze()
 
 
 class InterLin(nn.Module):
