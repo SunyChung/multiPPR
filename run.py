@@ -104,9 +104,12 @@ def evaluate(test_input):
         recall_list.append(recall_score)
         ndcg_score = NDCG(predictions, target_user_idxs, k=20)
         ndcg_list.append(ndcg_score)
-        test_loss = loss(predictions, target_user_idxs)
-        loss_list.append(test_loss.detach())
-    return recall_list, ndcg_list, loss_list
+        # loss 계산하려면 tensor 여야 하는데, 허허;
+        # 그러고보면 MacridVAE, RecVAE 모두 loss 출력은 안 함
+        # loss_list 지워도 됨
+        # test_loss = loss(predictions, target_user_idxs)
+        # loss_list.append(test_loss.detach())
+    return recall_list, ndcg_list
 
 
 def train(epoch, train_input, valid_input):
@@ -133,19 +136,17 @@ def train(epoch, train_input, valid_input):
         optimizer.step()
     print('one epoch training takes : ', time.time() - start)
     # evaluation with train data set
-    recall_list, ndcg_list, loss_list = evaluate(valid_input)
-    return recall_list, ndcg_list, loss_list
+    recall_list, ndcg_list = evaluate(valid_input)
+    return recall_list, ndcg_list
 
 
 for epoch in range(epochs):
-    recall_list, ndcg_list, loss_list = train(epoch, train_data, vad_data)
+    recall_list, ndcg_list = train(epoch, train_data, vad_data)
     print('returned recall :', np.mean(recall_list))
     print('returned NDCG : ', np.mean(ndcg_list))
-    print('returned mean loss : ', np.mean(loss_list))
 
 
 print('test started !')
-recall_list, ndcg_list, loss_list = evaluate(test_data)
+recall_list, ndcg_list = evaluate(test_data)
 print('returned recall :', np.mean(recall_list))
 print('returned NDCG : ', np.mean(ndcg_list))
-print('returned mean loss : ', np.mean(loss_list))
