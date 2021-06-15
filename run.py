@@ -93,8 +93,8 @@ def evaluate(test_input):
         target_user = uniq_users[i]
         target_user_idxs = np.where(input_array[target_user, :] == 1)[0]
         for j in range(len(uniq_items)):
-            predictions = np.zeros(uniq_items)
-            predictions[uniq_items[j]] = model(target_user, uniq_items[j]).detach().cpu().numpy()
+            predictions = np.zeros_like(uniq_items)
+            predictions[j] = model(target_user, uniq_items[j]).detach().cpu().numpy()
             recall_score = RECALL(predictions, target_user_idxs, k=20)
             recall_list.append(recall_score)
             ndcg_score = NDCG(predictions, target_user_idxs, k=20)
