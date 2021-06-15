@@ -94,13 +94,16 @@ def evaluate(test_input):
         target_user_idxs = np.where(input_array[target_user, :] == 1)[0]
         for j in range(len(uniq_items)):
             predictions = np.zeros_like(uniq_items)
+            result_check = model(target_user, uniq_items[j]).detach().cpu().numpy()
+            print('model output : ', result_check)
+            print('model shape : ', result_check.shape)
             predictions[j] = model(target_user, uniq_items[j]).detach().cpu().numpy()
-            recall_score = RECALL(predictions, target_user_idxs, k=20)
-            recall_list.append(recall_score)
-            ndcg_score = NDCG(predictions, target_user_idxs, k=20)
-            ndcg_list.append(ndcg_score)
-            test_loss = loss(predictions, target_user_idxs)
-            loss_list.append(test_loss.detach())
+        recall_score = RECALL(predictions, target_user_idxs, k=20)
+        recall_list.append(recall_score)
+        ndcg_score = NDCG(predictions, target_user_idxs, k=20)
+        ndcg_list.append(ndcg_score)
+        test_loss = loss(predictions, target_user_idxs)
+        loss_list.append(test_loss.detach())
     return recall_list, ndcg_list, loss_list
 
 
