@@ -94,7 +94,7 @@ def evaluate(test_input):
         target_user_idxs = np.where(input_array[target_user, :] == 1)[0]
         for item_idx in uniq_items:
             predictions = np.zeros_like(uniq_items)
-            predictions[item_idx] = model(target_user, item_idx).detach().numpy()
+            predictions[item_idx] = model(target_user, item_idx).to('cpu').numpy()
 
             recall_score = RECALL(predictions, target_user_idxs, k=20)
             recall_list.append(recall_score)
