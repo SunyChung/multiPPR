@@ -71,13 +71,24 @@ def numbered(tp, movie2id, user2id):
 
 
 if __name__ == '__main__':
-    data_dir = './data/ml-1m/'
-    threshold = 3.5
-    n_held_out_users = 500  # (50, 500, 10000, 40000)
-    test_prop = 0.2
+    # data_dir = './data/ml-1m/'
+    data_dir = './data/ml-20m/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
 
-    raw_data = pd.read_csv(data_dir + 'ratings.dat', sep='::',
-                           names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
+    threshold = 3.5
+    # n_held_out_users = 500  # (50, 500, 10000, 40000)
+    n_held_out_users = 10000
+    # ml-20m 에도 held_out 500 이면 되나 ?!
+    # ml-20m 은 사용자가 13 만명이니 heldout 은 1만 정도 되어야 ? or 4만 ?
+    # ml-1m 에서 500 / 6000 ~ 8% 정도 였으니
+    # ml-20m 에서 10000 / 130000 ~ 7%
+    test_prop = 0.2
+    # for ml-lm data : ratings.dat file processing
+    # raw_data = pd.read_csv(data_dir + 'ratings.dat', sep='::',
+    #                        names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
+    # for ml-20m data : ratings.csv
+    raw_data = pd.read_csv(data_dir + 'ratings.csv')
     raw_data = raw_data[raw_data['rating'] > threshold]  # [575281 rows x 4 columns]
     print('raw_data rating filtered : ', raw_data.shape)
 
