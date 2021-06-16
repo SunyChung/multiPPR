@@ -157,11 +157,16 @@ class MultiPPR(object):
 
 
 def NDCG(pred_rel, item_idxs, k):
+    # print('pred_rel : ', pred_rel)
+    # 이거 다 1 만 찍고 있는데, 왜 argsort() 는 작은 값을 정렬하고 있는 건지 ?!
     topk_idx = np.argsort(pred_rel)[::-1][:k]
     topk_pred = pred_rel[topk_idx]
-    dcg = np.array([topk_pred[i] / np.log2(topk_idx[i] + 2) for i in range(len(topk_idx))]).sum()
-    # what if the true item index list is shorter than the prediction list ?!
-    idcg = np.array([1 / np.log2(item_idxs[min(j, k)] + 2) for j in range(len(item_idxs))]).sum()
+    # print('topk_pred : ', topk_pred)
+    discount = 1. / np.log2(np.arange(2, k + 2))
+    dcg = np.array([topk_pred / discount]).sum()
+    idcg = np.array([discount[:min(len(item_idxs), k)]]).sum()
+    # print('len(item_idx) : ', len(item_idxs))
+    # print('idcg : ', idcg)
     return dcg / idcg
 
 
@@ -177,11 +182,10 @@ def RECALL(pred_rel, item_idx, k):
 
 
 if __name__ == '__main__':
-    data_dir = './data/ml-1m/'
+    # data_dir = './data/ml-1m/'
+    data_dir = './data/ml-20m/'
     damping_factors = [0.30, 0.50, 0.70, 0.85, 0.95]
 
-    # PPR calculation takes about 5 hours on my Mac (16GB),
-    # and takes about 3 hours on desktop (32GB)
     movie_mat = get_movie_matrix(data_dir)
     print('movie_mat shape : ', movie_mat.shape)
     multi_ppr = MultiPPR(damping_factors, movie_mat)
@@ -192,7 +196,7 @@ if __name__ == '__main__':
         scores, indices = multi_ppr.multi_contexts(i)
         per_item_ppr_dict[i] = scores
         per_item_idx_dict[i] = indices
-        if i % 300 == 0:
+        if i % 1000 == 0:
             print('%d nodes processed!' % i)
             print('upto now %f seconds passed' % (time.time() - start))
     end = time.time()
