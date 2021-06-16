@@ -12,18 +12,16 @@ class PPRfeatures(object):
         self.idx_values = np.array(list(idx_dict.values()))
         self.ppr_scores = np.array(list(ppr_dict.values()))
 
-    # embedding 사용할 거 아니면, 굳이 reshape() 할 필요 없음
-    # 근데, multi-factor 를 그냥 [5, 20] 으로 두면 계산이 영 -_;
     def idx_tensor(self):
         # dictionary shape : [all nodes idxs , multi-factors, ranked idxs]
-        idx_top_k = self.idx_values[:, :, 1:self.top_k+1]
+        idx_top_k = self.idx_values[:, :, :self.top_k]
         idx_tensor = torch.LongTensor(idx_top_k.reshape(idx_top_k.shape[0], -1))
         # print('idx_tensor shape : ', idx_tensor.shape)  # torch.Size([3505, 100])
         return idx_tensor
 
     def score_tensor(self):
         # dictionary shape : [all nodes idxs, multi-factors, ranked scores]
-        score_top_k = self.ppr_scores[:, :, 1:self.top_k+1]
+        score_top_k = self.ppr_scores[:, :, :self.top_k]
         score_tensor = torch.FloatTensor(score_top_k.reshape(score_top_k.shape[0], -1))
         # print('score_tensor shape : ', score_tensor.shape)  # torch.Size([3505, 100])
         return score_tensor
@@ -45,7 +43,10 @@ class PPRfeatures(object):
 
 
 if __name__ == '__main__':
-    data_dir = './data/ml-1m'
+    # data_dir = './data/ml-1m'
+    data_dir = './data/ml-20m/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
     top_k = 20
     multi_factor = 5
 
