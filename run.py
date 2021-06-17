@@ -28,10 +28,17 @@ data_dir = args.data_dir
 damping_factors = args.damping_factors
 learning_rate = args.learning_rate
 batch_size = args.batch_size
-epochs = args.epochs
+# epochs = args.epochs
+epochs = 10
+print('epochs : ', epochs)
 multi_factor = args.multi_factor
-top_k = args.top_k
-emb_dim = args.emb_dim
+# top_k = args.top_k # top_k = 15  # top_k = 5
+# top_k = 100  # RuntimeError: CUDA out of memory.
+top_k =  50
+print('extracting top-k features : ', top_k)
+# emb_dim = args.emb_dim
+emb_dim = 150
+print('embedding dimension : ', emb_dim)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using {} device'.format(device))
@@ -77,23 +84,53 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 print('learning rate : ', learning_rate)
 
 
-def evaluate(test_input, n_items):
+def evaluate(test_input):
     model.eval()
     row, col = test_input.nonzero()
     uniq_users = np.unique(row)
+    user_idx = np.where(uniq_users[:-1] != uniq_users[1:])[0] + 1
+    user_idx = np.insert(user_idx, 0, 0)
     uniq_items = np.unique(col)
     input_array = test_input.toarray()
     recall_list = []
     ndcg_list = []
-    for i in range(len(uniq_users)):
-        predictions = model(np.repeat(uniq_users[i], n_items), np.array(range(n_items))).detach().cpu().numpy()
-        target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
-
+    for i in range(len(user_idx)):
+        st_idx = user_idx[i]
+        ed_idx = user_idx[i+1]
+        predictions = model(row[st_idx:ed_idx], col[st_idx:ed_idx]).detach().cpu().numpy()
+        # target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
+        target_user_items = col[st_idx:ed_idx]
         ndcg_score = NDCG(predictions, target_user_items, k=100)
         ndcg_list.append(ndcg_score)
         recall_score = RECALL(predictions, target_user_items, k=100)
         recall_list.append(recall_score)
     return ndcg_list, recall_list
+
+
+'''
+def evaluate(data_tr, data_te, n_items):
+    model.eval()
+    tr_row, tr_col = data_tr.nonzero()
+    te_row, te_col = data_te.nonzero()
+    tr_users = np.unique(tr_row)
+    tr_items = np.unique(tr_col)
+    te_items = np.unique(te_col)
+    
+    
+    batch_uniq_users = np.repeat(uniq_users, n_items)
+    # np.repeat() repeats the elements of an array
+    # 499 x 3503 = (1747997,)
+    batch_n_items = np.tile(np.array(range(n_items)), len(uniq_users))
+    # whereas np.tile() repeat the whole array n-times
+    # 3503 x 499 = (1747997,)
+    # 이 경우에는 몇 개씩 데이터를 넣고, 예측값은 몇 개씩 나눠야 하나 ?!
+    # 3503 개를 하나의 묶음으로 봐야 하긴 함
+    # 근데, n_items 는 user 갯수만큼 반복해야지 dimension 이 맞을 듯 !
+    predictions = model(batch_uniq_users, batch_n_items)
+    # 여기서 정작 중요한 건 batch prediction 이 아닌데 ?!
+    # 다시 보니 아까 넣은 target item index 값도 잘 넣었는데 ...
+    test_array = test_data.toarray()
+'''
 
 
 def train(epoch, train_input, valid_input):
@@ -120,7 +157,7 @@ def train(epoch, train_input, valid_input):
         optimizer.step()
     print('one epoch training takes : ', time.time() - start)
     # evaluation with train data set
-    ndcg_list, recall_list = evaluate(valid_input, n_items)
+    ndcg_list, recall_list = evaluate(valid_input)
     return ndcg_list, recall_list
 
 
@@ -130,6 +167,6 @@ for epoch in range(epochs):
     print('returned recall :', np.mean(recall_list))
 
 print('test started !')
-ndcg_list, recall_list = evaluate(test_data, n_items)
+ndcg_list, recall_list = evaluate(test_data)
 print('returned NDCG : ', np.mean(ndcg_list))
 print('returned recall :', np.mean(recall_list))
