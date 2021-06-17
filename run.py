@@ -84,53 +84,29 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 print('learning rate : ', learning_rate)
 
 
-def evaluate(test_input):
+def evaluate(test_input, n_items):
     model.eval()
     row, col = test_input.nonzero()
     uniq_users = np.unique(row)
-    user_idx = np.where(uniq_users[:-1] != uniq_users[1:])[0] + 1
-    user_idx = np.insert(user_idx, 0, 0)
     uniq_items = np.unique(col)
     input_array = test_input.toarray()
     recall_list = []
     ndcg_list = []
-    for i in range(len(user_idx)):
-        st_idx = user_idx[i]
-        ed_idx = user_idx[i+1]
-        predictions = model(row[st_idx:ed_idx], col[st_idx:ed_idx]).detach().cpu().numpy()
-        # target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
-        target_user_items = col[st_idx:ed_idx]
+    for i in range(len(uniq_users)):
+        # 여기서 자꾸 문제가 뭐냐면, 사실 evluation 을 위해 맞춰야 하는 정답은
+        # target_user_items 인데,
+        # model 은 전체 item 인 n_items 에 대해서 prediction 을 하고 있음
+        # uniq_items 로만 prediction 하면, 좀 달라지나 ?
+        # 그리고 왜 prediction 은 전부 동일한 숫자만 찍는 건지 ?! -_
+        # pred_rel :  [0.41123354 0.41123354 0.41123354 ... 0.41123354 0.41123354 0.41123354]
+        predictions = model(np.repeat(uniq_users[i], len(uniq_items)), uniq_items).detach().cpu().numpy()
+        target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
+
         ndcg_score = NDCG(predictions, target_user_items, k=100)
         ndcg_list.append(ndcg_score)
         recall_score = RECALL(predictions, target_user_items, k=100)
         recall_list.append(recall_score)
     return ndcg_list, recall_list
-
-
-'''
-def evaluate(data_tr, data_te, n_items):
-    model.eval()
-    tr_row, tr_col = data_tr.nonzero()
-    te_row, te_col = data_te.nonzero()
-    tr_users = np.unique(tr_row)
-    tr_items = np.unique(tr_col)
-    te_items = np.unique(te_col)
-    
-    
-    batch_uniq_users = np.repeat(uniq_users, n_items)
-    # np.repeat() repeats the elements of an array
-    # 499 x 3503 = (1747997,)
-    batch_n_items = np.tile(np.array(range(n_items)), len(uniq_users))
-    # whereas np.tile() repeat the whole array n-times
-    # 3503 x 499 = (1747997,)
-    # 이 경우에는 몇 개씩 데이터를 넣고, 예측값은 몇 개씩 나눠야 하나 ?!
-    # 3503 개를 하나의 묶음으로 봐야 하긴 함
-    # 근데, n_items 는 user 갯수만큼 반복해야지 dimension 이 맞을 듯 !
-    predictions = model(batch_uniq_users, batch_n_items)
-    # 여기서 정작 중요한 건 batch prediction 이 아닌데 ?!
-    # 다시 보니 아까 넣은 target item index 값도 잘 넣었는데 ...
-    test_array = test_data.toarray()
-'''
 
 
 def train(epoch, train_input, valid_input):
@@ -157,7 +133,7 @@ def train(epoch, train_input, valid_input):
         optimizer.step()
     print('one epoch training takes : ', time.time() - start)
     # evaluation with train data set
-    ndcg_list, recall_list = evaluate(valid_input)
+    ndcg_list, recall_list = evaluate(valid_input, n_items)
     return ndcg_list, recall_list
 
 
@@ -167,6 +143,6 @@ for epoch in range(epochs):
     print('returned recall :', np.mean(recall_list))
 
 print('test started !')
-ndcg_list, recall_list = evaluate(test_data)
+ndcg_list, recall_list = evaluate(test_data, n_items)
 print('returned NDCG : ', np.mean(ndcg_list))
 print('returned recall :', np.mean(recall_list))
