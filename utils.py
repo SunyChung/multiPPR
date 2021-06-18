@@ -106,21 +106,13 @@ def load_data(data_dir):
     return n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te
 
 
-def load_vad_test_data(csv_file, n_items):
-    df = pd.read_csv(csv_file)
-    n_users = df['uid'].max() + 1
-    rows, cols = df['uid'].to_numpy(), df['sid'].to_numpy()
-    data = sparse.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float64', shape=(n_users, n_items))
-    return data
-
-
 def load_all(data_dir):
     with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
         train_sid = pickle.load(f)
     n_items = len(train_sid)
     train_data = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
-    vad_data = load_vad_test_data(os.path.join(data_dir, 'vad.csv'), n_items)
-    test_data = load_vad_test_data(os.path.join(data_dir, 'test.csv'), n_items)
+    vad_data = load_train_data(os.path.join(data_dir, 'vad.csv'), n_items)
+    test_data = load_train_data(os.path.join(data_dir, 'test.csv'), n_items)
     return n_items, train_data, vad_data, test_data
 
 
@@ -157,7 +149,7 @@ class MultiPPR(object):
 
 
 def NDCG(pred_rel, item_idxs, k):
-    # print('pred_rel : ', pred_rel)
+    print('pred_rel : ', pred_rel)
     # 이거 다 1 만 찍고 있는데, 왜 argsort() 는 작은 값을 정렬하고 있는 건지 ?!
     topk_idx = np.argsort(pred_rel)[::-1][:k]
     topk_pred = pred_rel[topk_idx]
