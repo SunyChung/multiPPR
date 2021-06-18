@@ -1,6 +1,7 @@
+import os
+import pickle
 import time
 import argparse
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,13 +9,12 @@ import torch.optim as optim
 
 from model import ContextualizedNN
 from layers import PPRfeatures
-from utils import *
+from utils import load_all, get_sparse_coord_value_shape
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
 # parser.add_argument('--data_dir', type=str, default='./data/ml-20m/')
-parser.add_argument('--damping_factors', type=list, default=[0.30, 0.50, 0.70, 0.85, 0.95])
 parser.add_argument('--learning_rate', type=float, default=1e-4, help='initial learning rate')
 # 5e-4, 1e-4, 1e-3
 parser.add_argument('--batch_size', type=int, default=500)
@@ -25,19 +25,19 @@ parser.add_argument('--emb_dim', type=int, default=10)
 
 args = parser.parse_args()
 data_dir = args.data_dir
-damping_factors = args.damping_factors
 learning_rate = args.learning_rate
 batch_size = args.batch_size
 # epochs = args.epochs
-epochs = 10
+# epochs = 10
+epochs = 1
 print('epochs : ', epochs)
 multi_factor = args.multi_factor
 # top_k = args.top_k # top_k = 15  # top_k = 5
 # top_k = 100  # RuntimeError: CUDA out of memory.
-top_k =  50
-print('extracting top-k features : ', top_k)
+top_k = 50
+print('extracting top-k : ', top_k)
 # emb_dim = args.emb_dim
-emb_dim = 150
+emb_dim = 100
 print('embedding dimension : ', emb_dim)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -72,16 +72,39 @@ with open(os.path.join(data_dir, 'unique_uidx'), 'rb') as f:
     unique_uidx = pickle.load(f)
 
 n_items, train_data, vad_data, test_data = load_all(data_dir)
+print('n_items : ', n_items)
 item_embedding = nn.Embedding(n_items, emb_dim)
 user_embedding = nn.Embedding(len(unique_uidx), emb_dim)
 
 model = ContextualizedNN(item_idx_tensor, item_scr_tensor, user_idx_tensor, user_scr_tensor,
-                         item_embedding, user_embedding).to(device)
+                         item_embedding, user_embedding, multi_factor, top_k).to(device)
 print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 print('learning rate : ', learning_rate)
+
+
+def NDCG(pred_rel, item_idxs, k):
+    topk_idx = np.argsort(pred_rel)[::-1][:k]
+    topk_pred = pred_rel[topk_idx]
+    discount = 1. / np.log2(np.arange(2, k + 2))
+    dcg = np.array([topk_pred * discount]).sum()
+    idcg = np.array([discount[:min(len(item_idxs), k)]]).sum()
+    return dcg / idcg
+
+
+def RECALL(pred_rel, item_idx, k):
+    print('true item length : ', len(item_idx))
+    topk_idx = np.argsort(pred_rel)[::-1][:k]
+    pred_binary = np.zeros_like(pred_rel, dtype=bool)
+    pred_binary[topk_idx] = True
+    true_binary = np.zeros_like(pred_rel, dtype=bool)
+    true_binary[item_idx] = True
+    tmp = (np.logical_and(pred_binary, true_binary).sum()).astype(np.float32)
+    # tmp = (np.logical_and(pred_binary[item_idx], true_binary[item_idx]).sum()).astype(np.float32)
+    recall = tmp / np.minimum(k, true_binary.sum())
+    return recall
 
 
 def evaluate(test_input, n_items):
@@ -93,13 +116,10 @@ def evaluate(test_input, n_items):
     recall_list = []
     ndcg_list = []
     for i in range(len(uniq_users)):
-        # 여기서 자꾸 문제가 뭐냐면, 사실 evluation 을 위해 맞춰야 하는 정답은
-        # target_user_items 인데,
-        # model 은 전체 item 인 n_items 에 대해서 prediction 을 하고 있음
-        # uniq_items 로만 prediction 하면, 좀 달라지나 ?
-        # 그리고 왜 prediction 은 전부 동일한 숫자만 찍는 건지 ?! -_
-        # pred_rel :  [0.41123354 0.41123354 0.41123354 ... 0.41123354 0.41123354 0.41123354]
-        predictions = model(np.repeat(uniq_users[i], len(uniq_items)), uniq_items).detach().cpu().numpy()
+        user_idxs = np.repeat(uniq_users[i], n_items)
+        item_idxs = range(n_items)
+        predictions = model(user_idxs, item_idxs).detach().cpu().numpy()
+        # print('predictions : ', predictions)
         target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
 
         ndcg_score = NDCG(predictions, target_user_items, k=100)
@@ -127,6 +147,7 @@ def train(epoch, train_input, valid_input):
         item_idxs = train_coords[train_idxlist[st_idx:end_idx]][:, 1]
 
         predictions = model(user_idxs, item_idxs)
+        # 근데, 여기서 문제가 target 이 다 1 이라는 거 -_ 이렇게 훈련하면 당연히 1 로만 수렴하게 됨 !
         targets = torch.Tensor(train_values[train_idxlist[st_idx:end_idx]])
         train_loss = loss(predictions.to('cpu'), targets)
         train_loss.backward()
