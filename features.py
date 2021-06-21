@@ -55,15 +55,15 @@ class OneFactorFeature(object):
 
     def idx_tensor(self):
         idx_top_k = self.idx_values[:, :self.top_k]
-        print('idx_top_k shape : ', idx_top_k.shape)
+        # print('idx_top_k shape : ', idx_top_k.shape)  # (3503, 50), (6031, 50)
         idx_tensor = torch.LongTensor(idx_top_k.reshape(idx_top_k.shape[0], -1))
-        print('idx_tensor shape : ', idx_tensor.shape)
+        # print('idx_tensor shape : ', idx_tensor.shape)  # torch.Size([3503, 50]), torch.Size([6031, 50])
         # [all nodes idxs, top-k]
         return idx_tensor
 
     def ppr_tensor(self):
         ppr_top_k = self.ppr_scores[:, :self.top_k]
-        ppr_tensor = torch.LongTensor(ppr_top_k.reshape(ppr_top_k.shape[0], -1))
+        ppr_tensor = torch.FloatTensor(ppr_top_k.reshape(ppr_top_k.shape[0], -1))
         # should be [all nodes idxs, top-k]
         return ppr_tensor
 
