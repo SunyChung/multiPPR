@@ -48,19 +48,16 @@ with open(os.path.join(data_dir, 'per_item_idx.dict'), 'rb') as f:
     item_idx_dict = pickle.load(f)
 with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'rb') as f:
     item_ppr_dict = pickle.load(f)
-
 pf = PPRfeatures(data_dir, top_k, item_idx_dict, item_ppr_dict)
 item_idx_tensor = pf.idx_tensor()
 item_scr_tensor = pf.score_tensor()
 del item_idx_dict
 del item_ppr_dict
-
 # user context tensor
 with open(os.path.join(data_dir, 'per_user_idx.dict'), 'rb') as f:
     user_idx_dict = pickle.load(f)
 with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'rb') as f:
     user_ppr_dict = pickle.load(f)
-
 pf = PPRfeatures(data_dir, top_k, user_idx_dict, user_ppr_dict)
 user_idx_tensor = pf.idx_tensor()
 user_scr_tensor = pf.score_tensor()
@@ -70,7 +67,6 @@ del user_ppr_dict
 # for user embedding size
 with open(os.path.join(data_dir, 'unique_uidx'), 'rb') as f:
     unique_uidx = pickle.load(f)
-
 n_items, train_data, vad_data, test_data = load_all(data_dir)
 print('n_items : ', n_items)
 item_embedding = nn.Embedding(n_items, emb_dim)
@@ -93,7 +89,12 @@ def NDCG(pred_rel, item_idxs, k):
     discount = 1. / np.log2(np.arange(2, k + 2))
     dcg = np.array(topk_pred * discount).sum()
     print('dcg : ', dcg)
-    idcg = np.array(discount[:min(len(item_idxs), k)].sum())
+    # max() 로 하니 item_idx 길이랑 k 가 같아지면서
+    # dcg / idcg = 1 값이 나옴
+    # 다시 한 번, prediction 값이 모두 1 이라서 생기는 결과임을 확인 !
+    # 결론은 dataset 을 0 과 1 이 모두 포함되게 바꾸거나
+    # positive-negative pair 로 훈련시켜야 함
+    idcg = np.array(discount[:max(len(item_idxs), k)].sum())
     print('idcg : ', idcg)
     print('dcg / idcg : ', dcg / idcg)
     return dcg / idcg
