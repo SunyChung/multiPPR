@@ -7,8 +7,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from model import ContextualizedNN
-from layers import PPRfeatures
+from multi_model import ContextualizedNN
+from features import PPRfeatures
 from utils import load_all, get_sparse_coord_value_shape
 
 
@@ -88,21 +88,25 @@ print('learning rate : ', learning_rate)
 def NDCG(pred_rel, item_idxs, k):
     topk_idx = np.argsort(pred_rel)[::-1][:k]
     topk_pred = pred_rel[topk_idx]
+    # print('topk_pred : ', topk_pred)  # 전부 1 만 ....;
+    # 그래서 dcg 값이 idcg 값보다 커지고 있음 -_
     discount = 1. / np.log2(np.arange(2, k + 2))
-    dcg = np.array([topk_pred * discount]).sum()
-    idcg = np.array([discount[:min(len(item_idxs), k)]]).sum()
+    dcg = np.array(topk_pred * discount).sum()
+    print('dcg : ', dcg)
+    idcg = np.array(discount[:min(len(item_idxs), k)].sum())
+    print('idcg : ', idcg)
+    print('dcg / idcg : ', dcg / idcg)
     return dcg / idcg
 
 
 def RECALL(pred_rel, item_idx, k):
-    print('true item length : ', len(item_idx))
+    # print('true item length : ', len(item_idx))
     topk_idx = np.argsort(pred_rel)[::-1][:k]
     pred_binary = np.zeros_like(pred_rel, dtype=bool)
     pred_binary[topk_idx] = True
     true_binary = np.zeros_like(pred_rel, dtype=bool)
     true_binary[item_idx] = True
     tmp = (np.logical_and(pred_binary, true_binary).sum()).astype(np.float32)
-    # tmp = (np.logical_and(pred_binary[item_idx], true_binary[item_idx]).sum()).astype(np.float32)
     recall = tmp / np.minimum(k, true_binary.sum())
     return recall
 
@@ -123,6 +127,7 @@ def evaluate(test_input, n_items):
         target_user_items = np.where(input_array[uniq_users[i], :] == 1)[0]
 
         ndcg_score = NDCG(predictions, target_user_items, k=100)
+        # print('ndcg_score ', ndcg_score)
         ndcg_list.append(ndcg_score)
         recall_score = RECALL(predictions, target_user_items, k=100)
         recall_list.append(recall_score)
