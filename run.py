@@ -26,7 +26,7 @@ parser.add_argument('--damping', type=float, default=0.85)
 args = parser.parse_args()
 data_dir = args.data_dir
 learning_rate = args.learning_rate
-batch_size = args.batch_size
+# batch_size = args.batch_size
 # epochs = args.epochs
 # epochs = 10
 epochs = 1
@@ -83,6 +83,7 @@ del user_ppr_dict
 with open(os.path.join(data_dir, 'unique_uidx'), 'rb') as f:
     unique_uidx = pickle.load(f)
 n_items, train_coords, train_values, vad_coords, vad_values, test_coords, test_values = load_all(data_dir)
+batch_size = n_items
 print('n_items : ', n_items)
 item_embedding = nn.Embedding(n_items, emb_dim)
 user_embedding = nn.Embedding(len(unique_uidx), emb_dim)
@@ -114,7 +115,12 @@ def RECALL(predictions, targets, k):
     pred_binary = np.zeros_like(predictions, dtype=bool)
     pred_binary[topk_idx] = True
     tmp = (np.logical_and(pred_binary, targets).sum()).astype(np.float32)
-    recall = tmp / np.minimum(k, targets.sum())
+    # print('targets : ', targets)
+    print('target sum : ', targets.sum())  # 왜 다 0 이지 ?!
+    # 이것 때문에라도 data shape 바꿔야 ...
+    # 근데, 이 정도로 sparse 한가 ?!
+    dinorm = min(k, targets.sum())
+    recall = tmp / dinorm
     return recall
 
 
@@ -132,6 +138,8 @@ def evaluate(test_coords, test_values):
         predictions = model(user_idxs, item_idxs).detach().cpu().numpy()
         # print('predictions : ', predictions)
         targets = test_values[test_idxlist[st_idx:end_idx]]
+        # print('targets : ', targets)
+        # print('target shape : ', targets.shape)
         ndcg_score = NDCG(predictions, targets, k=100)
         ndcg_list.append(ndcg_score)
         recall_score = RECALL(predictions, targets, k=100)
