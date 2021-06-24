@@ -17,6 +17,8 @@ class ContextualizedNN(nn.Module):
         self.item_emb = item_embedding.to(self.device)  # nn.Embedding(n_items, emb_dim)
         self.user_emb = user_embedding.to(self.device)  # nn.Embedding(len(unique_uidx), emb_dim)
 
+        # self.inter_input_dim = self.item_emb.embedding_dim
+        # self.inter_lin = InterLin(input_dim=self.inter_input_dim, hidden=self.inter_input_dim//10, output_dim=1)
         self.cat_dim = self.item_emb.embedding_dim * 2
         self.inter_lin = InterLin(input_dim=self.cat_dim,
                                   hidden1=self.cat_dim // 2, hidden2=self.cat_dim // 4,
@@ -30,17 +32,30 @@ class ContextualizedNN(nn.Module):
         neigh_score = self.user_scr_tensor[user_neighs].to(self.device)
         scored_user_emb = torch.matmul(neigh_score, neigh_emb)
         # batch_size x [top_k x multi_factor] x embed_dim
+        # user_reshaped = torch.reshape(scored_user_emb, (-1, scored_user_emb.shape[1]*scored_user_emb.shape[2]))
+        # batch_size x [top_k x multi_factor x embed_dim]
 
         item_neighs = self.item_idx_tensor[item_idxs].to(self.device)
         item_neigh_emb = self.item_emb(item_neighs).to(self.device)
         item_neigh_scr = self.item_scr_tensor[item_neighs].to(self.device)
         scored_item_emb = torch.matmul(item_neigh_scr, item_neigh_emb)
+        # item_reshaped = torch.reshape(scored_item_emb, (-1, scored_item_emb.shape[1]*scored_item_emb.shape[2]))
 
         interaction_cat = torch.cat((scored_user_emb, scored_item_emb), dim=-1)
         # print('interaction_cat shape : ', interaction_cat.shape)
         # batch_size, [multi_factor x top_k], embedding_dim x 2
         result = torch.sigmoid(self.inter_lin(interaction_cat))
+        # batch_size, 1
         return torch.mean(result, dim=-2).squeeze()
+        # pair-wise multiplication for interaction layer
+        # interaction = scored_user_emb * scored_item_emb
+        # print('interaction shape : ', interaction.shape)
+        # batch_size x [top_k x multi_factor] x embed_dim
+        # result = torch.sigmoid(self.inter_lin(interaction))
+        # print('result shape : ', result.shape)
+        # for batch training : torch.Size([500, 100, 1])
+        # for one id evaluation : torch.Size([100, 1])
+        # return torch.mean(result, dim=-2).squeeze()
 
 
 class InterLin(nn.Module):
