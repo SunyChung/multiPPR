@@ -102,14 +102,27 @@ def load_data(data_dir):
     return n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te
 
 
+def get_all_from_sparse(sparse_mat):
+    mat_array = sparse_mat.toarray()
+    values = mat_array.flatten()
+    coords = []
+    for i in range(sparse_mat.shape[0]):
+        for j in range(sparse_mat.shape[1]):
+            coords.append(np.array([i, j]))
+    return np.array(coords), values
+
+
 def load_all(data_dir):
     with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
         train_sid = pickle.load(f)
     n_items = len(train_sid)
-    train_data = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
-    vad_data = load_train_data(os.path.join(data_dir, 'vad.csv'), n_items)
-    test_data = load_train_data(os.path.join(data_dir, 'test.csv'), n_items)
-    return n_items, train_data, vad_data, test_data
+    train_sparse = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
+    train_coords, train_values = get_all_from_sparse(train_sparse)
+    vad_sparse = load_train_data(os.path.join(data_dir, 'vad.csv'), n_items)
+    vad_coords, vad_values = get_all_from_sparse(vad_sparse)
+    test_sparse = load_train_data(os.path.join(data_dir, 'test.csv'), n_items)
+    test_coords, test_values = get_all_from_sparse(test_sparse)
+    return n_items, train_coords, train_values, vad_coords, vad_values, test_coords, test_values
 
 
 def get_sparse_coord_value_shape(sparse_mat):
@@ -119,3 +132,24 @@ def get_sparse_coord_value_shape(sparse_mat):
     values = sparse_mat.data
     shape = sparse_mat.shape
     return coords, values, shape
+
+
+def per_user_neg_idxs(data_dir, csv_file):
+    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
+        train_sid = pickle.load(f)
+    n_items = len(train_sid)
+    
+    df = pd.read_csv(os.path.join(data_dir, csv_file))
+    # unique_users = df['uid'].unique()
+    user_item_dict = dict(df.groupby('uid')['sid'].apply(list))
+    user_keys = np.array(list(user_item_dict.keys()))
+
+    # df.groupby('uid')['sid] : returns `pandas.core.series.Series`
+    # df.loc[df['uid']==6023]
+    # len(user_item_dict[6023])
+    user_neg_items = {}
+    for user in user_keys:
+        # should the values be list or array ?!
+        neg = list(set(train_sid) - set(user_item_dict[0]))
+        user_neg_items[user] = neg
+    return user_neg_items
