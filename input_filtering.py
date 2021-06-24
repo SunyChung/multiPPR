@@ -34,8 +34,10 @@ def data_filtering(data_dir, raw_data):
     sparsity = 1. * filtered_pd.shape[0] / (user_activity.shape[0] * item_popularity.shape[0])
     print('after filtering, there are %d watching events from %d users and %d movies (sparsity: %.3f%%)'
           % (filtered_pd.shape[0], user_activity.shape[0], item_popularity.shape[0], sparsity * 100))
+    # ml-1m
     # after filtering, there are 574548 watching events from 6031 users and 3533 movies (sparsity: 2.696%)
-
+    # ml-20m
+    # after filtering, there are 9857803 watching events from 136477 users and 20649 movies (sparsity: 0.350%)
     filtered_pd = filtered_pd[['userId', 'movieId']]
     with open(data_dir + 'filtered_ratings.csv', 'w') as f:
         filtered_pd.to_csv(f, index=False)
