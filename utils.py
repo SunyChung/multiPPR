@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import pickle
-from scipy import sparse
 from scipy.sparse import csr_matrix, isspmatrix_coo
+from collections import defaultdict
 import os
 
 
@@ -33,9 +33,9 @@ def get_bipartite_matrix(data_dir):
 
     data = np.ones(len(row), dtype=int)
     print('max(row) : ', max(row))  # 6030
-    print('max(col) : ', max(col))  # 3504
+    print('max(col) : ', max(col))  # 3502  # 3504
     print('unique row : ', len(pd.unique(row)))  # 6031
-    print('unique col : ', len(pd.unique(col)))  # 3505
+    print('unique col : ', len(pd.unique(col)))  # 3503 # 3505
     bi_matrix = csr_matrix((data, (row, col)), shape=(max(row) + 1, max(col) + 1))
     return bi_matrix
 
@@ -53,76 +53,57 @@ def get_user_matrix(data_dir):
 
 
 # train, validation, test data 는 모두 index 값으로 mapping 된 상태 !
-def load_train_data(csv_file, n_items):
+def get_target_1(csv_file):
     df = pd.read_csv(csv_file)
-    n_users = df['uid'].max() + 1
-    rows, cols = df['uid'].to_numpy(), df['sid'].to_numpy()
-    data = sparse.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float64', shape=(n_users, n_items))
-    return data
+    triplet = []
+    for i in range(len(df)):
+        triplet.append(np.array([df['uid'][i], df['sid'][i], 1]))
+    return np.array(triplet)
 
 
-def load_tr_te_data(csv_file_tr, csv_file_te, n_items):
-    df_tr = pd.read_csv(csv_file_tr)
-    df_te = pd.read_csv(csv_file_te)
-
-    start_idx = min(df_tr['uid'].min(), df_te['uid'].min())
-    end_idx = max(df_tr['uid'].max(), df_te['uid'].max())
-
-    rows_tr, cols_tr = df_tr['uid'] - start_idx, df_tr['sid']
-    rows_te, cols_te = df_te['uid'] - start_idx, df_te['sid']
-
-    data_tr = sparse.csr_matrix((np.ones_like(rows_tr), (rows_tr, cols_tr)),
-                                dtype='float64', shape=(end_idx - start_idx + 1, n_items))
-    data_te = sparse.csr_matrix((np.ones_like(rows_te), (rows_te, cols_te)),
-                                dtype='float64', shape=(end_idx - start_idx + 1, n_items))
-    return data_tr, data_te
+def get_target_0(csv_file, train_sid):
+    df = pd.read_csv(csv_file)
+    group_dict = df.groupby('uid').groups
+    triplet = []
+    for i in group_dict.keys():
+        target_0_items = list(set(train_sid) - set(group_dict[i]))
+        for j in range(len(target_0_items)):
+            triplet.append(np.array([i, target_0_items[j], 0]))
+    return np.array(triplet)
 
 
-def load_data(data_dir):
-    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
-        train_sid = pickle.load(f)
-    # n_items = max(train_sid)  # 3952 이거 쓰면 안 됨!
-    # mapping 된 값이 3505 이니, 이걸로 !!
-    # sid_to_sidx 도 어차피 len(sid_to_sidx) = 3505
-    n_items = len(train_sid)  # 3505
-
-    train_data = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
-    vad_data_tr, vad_data_te = load_tr_te_data(os.path.join(data_dir, 'vad_tr.csv'),
-                                               os.path.join(data_dir, 'vad_te.csv'),
-                                               n_items)
-    test_data_tr, test_data_te = load_tr_te_data(os.path.join(data_dir, 'test_tr.csv'),
-                                                 os.path.join(data_dir, 'test_te.csv'),
-                                                 n_items)
-
-    assert n_items == train_data.shape[1]
-    assert n_items == vad_data_tr.shape[1]
-    assert n_items == vad_data_te.shape[1]
-    assert n_items == test_data_tr.shape[1]
-    assert n_items == test_data_te.shape[1]
-    return n_items, train_data, vad_data_tr, vad_data_te, test_data_tr, test_data_te
+# need to shuffle in user group!
+def get_targets(csv_file, train_sid):
+    df = pd.read_csv(csv_file)
+    group_dict = df.groupby('uid').groups
+    triplet = []
+    for i in group_dict.keys():
+        for j in group_dict[i]:
+            triplet.append(np.array([i, j, 1]))
+        target_0_items = list(set(train_sid) - set(group_dict[i]))
+        for k in range(len(target_0_items)):
+            triplet.append(np.array([i, target_0_items[k], 0]))
+    return np.array(triplet)  # (18093347, 3)
 
 
-def get_all_from_sparse(sparse_mat):
-    mat_array = sparse_mat.toarray()
-    values = mat_array.flatten()
-    coords = []
-    for i in range(sparse_mat.shape[0]):
-        for j in range(sparse_mat.shape[1]):
-            coords.append(np.array([i, j]))
-    return np.array(coords), values
+def triplet_dict(csv_file, train_sid):
+    df = pd.read_csv(csv_file)
+    grouped_df = df.groupby('uid').sid.apply(np.array).reset_index()
+    uid_sid = defaultdict(list)
+    for i in range(len(grouped_df)):
+        for j in grouped_df['sid'][i]:
+            uid_sid[grouped_df['uid'][i]].append(np.array([j, 1]))
+        target_0_items = list(set(train_sid) - set(grouped_df['sid'][i]))
+        for k in target_0_items:
+            uid_sid[grouped_df['uid'][i]].append(np.array([k, 0]))
+    return uid_sid
 
 
-def load_all(data_dir):
-    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
-        train_sid = pickle.load(f)
-    n_items = len(train_sid)
-    train_sparse = load_train_data(os.path.join(data_dir, 'train.csv'), n_items)
-    train_coords, train_values = get_all_from_sparse(train_sparse)
-    vad_sparse = load_train_data(os.path.join(data_dir, 'vad.csv'), n_items)
-    vad_coords, vad_values = get_all_from_sparse(vad_sparse)
-    test_sparse = load_train_data(os.path.join(data_dir, 'test.csv'), n_items)
-    test_coords, test_values = get_all_from_sparse(test_sparse)
-    return n_items, train_coords, train_values, vad_coords, vad_values, test_coords, test_values
+def dict_shuffle(dic):
+    shuffled = {}
+    for i in dic.keys():
+        shuffled = dic[i].shuffle
+    return shuffled
 
 
 def get_sparse_coord_value_shape(sparse_mat):
