@@ -14,8 +14,6 @@ def get_count(tp, id):
 def filter_triplets(tp, min_sc=0, min_uc=5):
     if min_sc > 0:
         item_count = get_count(tp, 'movieId')
-        # depending on the pandas version the below ['size'] returns error message !
-        # this works for pandas = 1.1.2 or later versions
         tp = tp[tp['movieId'].isin(item_count.index[item_count['size'] >= min_sc])]
         print('movieId filtered !')
 
@@ -24,7 +22,7 @@ def filter_triplets(tp, min_sc=0, min_uc=5):
         tp = tp[tp['userId'].isin(user_count.index[user_count['size'] >= min_uc])]
         print('userId filtered!')
 
-    print('filtered "tp" shape : ', tp.shape)
+    # print('filtered "tp" shape : ', tp.shape)  # (574548, 4)
     user_count, item_count = get_count(tp, 'userId'), get_count(tp, 'movieId')
     return tp, user_count, item_count
 
@@ -37,9 +35,8 @@ def data_filtering(data_dir, raw_data):
     # ml-1m
     # after filtering, there are 574548 watching events from 6031 users and 3533 movies (sparsity: 2.696%)
     # ml-20m
-    # after filtering, there are 9857803 watching events from 136477 users and 20649 movies (sparsity: 0.350%)
     filtered_pd = filtered_pd[['userId', 'movieId']]
-    with open(data_dir + 'filtered_ratings.csv', 'w') as f:
+    with open(os.path.join(data_dir, 'filtered_ratings.csv'), 'w') as f:
         filtered_pd.to_csv(f, index=False)
     return filtered_pd, user_activity, item_popularity
 
@@ -66,55 +63,33 @@ def split_train_test_proportion(data, test_prop):
     return data_tr, data_te
 
 
-def numbered(tp, movie2id, user2id):
-    uid = tp['userId'].apply(lambda x: user2id[x])
-    sid = tp['movieId'].apply(lambda x: movie2id[x])
-    return pd.DataFrame(data={'uid': uid, 'sid': sid}, columns=['uid', 'sid'])
-
-
 if __name__ == '__main__':
-    # data_dir = './data/ml-1m/'
-    data_dir = './data/ml-20m/'
+    data_dir = './data/ml-1m'
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
     threshold = 3.5
-    # n_held_out_users = 500  # (50, 500, 10000, 40000)
-    n_held_out_users = 10000
-    # ml-20m 에도 held_out 500 이면 되나 ?!
-    # ml-20m 은 사용자가 13 만명이니 heldout 은 1만 정도 되어야 ? or 4만 ?
-    # ml-1m 에서 500 / 6000 ~ 8% 정도 였으니
-    # ml-20m 에서 10000 / 130000 ~ 7%
+    n_held_out_users = 500  # for ml-1m
     test_prop = 0.2
-    # for ml-lm data : ratings.dat file processing
-    # raw_data = pd.read_csv(data_dir + 'ratings.dat', sep='::',
-    #                        names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
-    # for ml-20m data : ratings.csv
-    raw_data = pd.read_csv(data_dir + 'ratings.csv')
-    raw_data = raw_data[raw_data['rating'] > threshold]  # [575281 rows x 4 columns]
-    print('raw_data rating filtered : ', raw_data.shape)
-
+    raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.dat'), sep='::',
+                            names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
+    raw_data = raw_data[raw_data['rating'] > threshold]
     filtered_pd, user_count, item_count = data_filtering(data_dir, raw_data)
 
-    ######################### userId - idx mapping #############################
-    # uidx 는 0 부터 순차적으로 증가하는 index 값 (user_count, 즉, pandas groupby 로 return 되는 값)
-    # unique_uidx : filtering 된 전체 userId index
-    # -> train, validation, test set splitting 에 사용해야 함
     unique_uidx = user_count.index
     print('number of total users : ', len(unique_uidx))
     with open(os.path.join(data_dir, 'unique_uidx'), 'wb') as f:
         pickle.dump(unique_uidx, f)
 
-    # uidx 와 uid 간의 mapping dictionary !
     uidx_to_uid = user_count['userId'].to_dict()
-    with open(data_dir + 'uidx_to_uid.dict', 'wb') as f:
+    with open(os.path.join(data_dir, 'uidx_to_uid.dict'), 'wb') as f:
         pickle.dump(uidx_to_uid, f)
-    uid_to_uidx = {value: key for (key, value) in uidx_to_uid.items()}
-    with open(data_dir + 'uid_to_uidx.dict', 'wb') as f:
-        pickle.dump(uid_to_uidx, f)
-    ######################### userId - idx mapping #############################
 
-    np.random.seed(1324)
+    uid_to_uidx = {value: key for (key, value) in uidx_to_uid.items()}
+    with open(os.path.join(data_dir, 'uid_to_uidx.dict'), 'wb') as f:
+        pickle.dump(uid_to_uidx, f)
+
+    np.random.seed(1234)
     idx_perm = np.random.permutation(unique_uidx.size)
     unique_uidx = unique_uidx[idx_perm]
 
@@ -127,50 +102,32 @@ if __name__ == '__main__':
     print('# of validation users : ', len(vd_users))
     print('# of test users : ', len(te_users))
 
-    ######################### movieId - idx mapping ############################
-    # 어차피 train, validation, test set 은 모두 train 에 들어 있는 item ID 만 사용함 !!
-    # 그러니, 전체 item ID mapping 할 필요없음 !
-    # train_sid 만 item 으로 남게 됨
-    ######################### movieId - idx mapping ############################
+    filtered_pd['userId'] = filtered_pd['userId'].map(uid_to_uidx)
     train_plays = filtered_pd.loc[filtered_pd['userId'].isin(tr_users)]
-    train_sid = pd.unique(train_plays['movieId'])
-    print('length of unique train items : ', len(train_sid))   # 3505
-    with open(os.path.join(data_dir, 'train_sid'), 'wb') as f:
-        pickle.dump(train_sid, f)
+    train_movie = pd.unique(train_plays['movieId'])
+    print('length of unique train items : ', len(train_movie))
+    # filtering movieId with train movies
+    filtered_pd = filtered_pd.loc[filtered_pd['movieId'].isin(train_movie)]
 
     # sid (1 부터 시작 !) 와 sidx (0 부터 시작 !)
-    sid_to_sidx = {sid: i for (i, sid) in enumerate(train_sid)}
+    sid_to_sidx = {sid: i for (i, sid) in enumerate(train_movie)}
     with open(os.path.join(data_dir, 'sid_to_sidx.dict'), 'wb') as f:
         pickle.dump(sid_to_sidx, f)
+
     sidx_to_sid = {value: key for (key, value) in sid_to_sidx.items()}
     with open(os.path.join(data_dir, 'sidx_to_sid.dict'), 'wb') as f:
         pickle.dump(sidx_to_sid, f)
 
-    train_data = numbered(train_plays, sid_to_sidx, uid_to_uidx)
-    train_data.to_csv(os.path.join(data_dir, 'train.csv'), index=False)
+    train_sid = np.array([sid_to_sidx[x] for x in train_movie])
+    with open(os.path.join(data_dir, 'train_sid'), 'wb') as f:
+        pickle.dump(train_sid, f)
+    filtered_pd['movieId'] = filtered_pd['movieId'].map(sid_to_sidx)
+
+    train_plays['movieId'] = train_plays['movieId'].map(sid_to_sidx)
+    train_plays.to_csv(os.path.join(data_dir, 'train.csv'), index=False)
 
     vad_plays = filtered_pd.loc[filtered_pd['userId'].isin(vd_users)]
-    vad_plays = vad_plays.loc[vad_plays['movieId'].isin(train_sid)]
-    vad_data = numbered(vad_plays, sid_to_sidx, uid_to_uidx)
-    vad_data.to_csv(os.path.join(data_dir, 'vad.csv'), index=False)
-
-    vad_plays_tr, vad_plays_te = split_train_test_proportion(vad_plays, test_prop)
-    vad_data_tr = numbered(vad_plays_tr, sid_to_sidx, uid_to_uidx)
-    vad_data_te = numbered(vad_plays_te, sid_to_sidx, uid_to_uidx)
-    # print(vad_data_tr)
-    # print(vad_data_te)
-    vad_data_tr.to_csv(os.path.join(data_dir, 'vad_tr.csv'), index=False)
-    vad_data_te.to_csv(os.path.join(data_dir, 'vad_te.csv'), index=False)
+    vad_plays.to_csv(os.path.join(data_dir, 'vad.csv'), index=False)
 
     test_plays = filtered_pd.loc[filtered_pd['userId'].isin(te_users)]
-    test_plays = test_plays.loc[test_plays['movieId'].isin(train_sid)]
-    test_data = numbered(test_plays, sid_to_sidx, uid_to_uidx)
-    test_data.to_csv(os.path.join(data_dir, 'test.csv'), index=False)
-
-    test_plays_tr, test_plays_te = split_train_test_proportion(test_plays, test_prop)
-    test_data_tr = numbered(test_plays_tr, sid_to_sidx, uid_to_uidx)
-    test_data_te = numbered(test_plays_te, sid_to_sidx, uid_to_uidx)
-    # print(test_data_tr)
-    # print(test_data_te)
-    test_data_tr.to_csv(os.path.join(data_dir, 'test_tr.csv'), index=False)
-    test_data_te.to_csv(os.path.join(data_dir, 'test_te.csv'), index=False)
+    test_plays.to_csv(os.path.join(data_dir, 'test.csv'), index=False)
