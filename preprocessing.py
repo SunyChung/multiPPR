@@ -41,28 +41,6 @@ def data_filtering(data_dir, raw_data):
     return filtered_pd, user_activity, item_popularity
 
 
-def split_train_test_proportion(data, test_prop):
-    data_grouped_by_user = data.groupby('userId')
-    tr_list, te_list = [], []
-    np.random.seed(1324)
-
-    for i, (_, group) in enumerate(data_grouped_by_user):
-        n_items_u = len(group)
-        if n_items_u >= 5:
-            idx = np.zeros(n_items_u, dtype='bool')
-            idx[np.random.choice(n_items_u, size=int(test_prop * n_items_u), replace=False).astype('int64')] = True
-            tr_list.append(group[np.logical_not(idx)])
-            te_list.append(group[idx])
-        else:
-            tr_list.append(group)
-        if i % 100 == 0:
-            print('%d users sampled' %i)
-            sys.stdout.flush()
-    data_tr = pd.concat(tr_list)
-    data_te = pd.concat(te_list)
-    return data_tr, data_te
-
-
 if __name__ == '__main__':
     data_dir = './data/ml-1m'
     if not os.path.exists(data_dir):
@@ -122,6 +100,7 @@ if __name__ == '__main__':
     with open(os.path.join(data_dir, 'train_sid'), 'wb') as f:
         pickle.dump(train_sid, f)
     filtered_pd['movieId'] = filtered_pd['movieId'].map(sid_to_sidx)
+    filtered_pd.to_csv(os.path.join(data_dir, 'filtered_pd.csv'), index=False)
 
     train_plays['movieId'] = train_plays['movieId'].map(sid_to_sidx)
     train_plays.to_csv(os.path.join(data_dir, 'train.csv'), index=False)
