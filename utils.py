@@ -6,23 +6,10 @@ import os
 
 
 def get_bipartite_matrix(data_dir):
-    df = pd.read_csv(os.path.join(data_dir, 'filtered_ratings.csv'))
-
-    with open(os.path.join(data_dir, 'train_sid'), 'rb') as f:
-        train_sid = pickle.load(f)
-    with open(os.path.join(data_dir, 'uid_to_uidx.dict'), 'rb') as f:
-        uid_to_uidx = pickle.load(f)
-    with open(os.path.join(data_dir, 'sid_to_sidx.dict'), 'rb') as f:
-        sid_to_sidx = pickle.load(f)
-
+    df = pd.read_csv(os.path.join(data_dir, 'filtered_pd.csv'))
+    # load filtered & idx mapped dataframe !
     col = df['movieId']
-    col = col.loc[col.isin(train_sid)]
-    col = col.map(sid_to_sidx)
-
-    row = df['userId'].map(uid_to_uidx)
-    # WHY col.index ?!
-    row = row[col.index]
-
+    row = df['userId']
     data = np.ones(len(row), dtype=int)
     print('max(row) : ', max(row))
     print('max(col) : ', max(col))
