@@ -4,73 +4,58 @@ import torch.nn.functional as F
 
 
 class ContextualizedNN(nn.Module):
-    def __init__(self, item_idx_tensor, item_scr_tensor, user_idx_tensor, user_scr_tensor,
-                         item_embedding, user_embedding, multi_factor, top_k):
+    def __init__(self, item_idx_tensor, item_scr_tensor,
+                 user_idx_tensor, user_scr_tensor,
+                 item_embedding, user_embedding):
         super(ContextualizedNN, self).__init__()
 
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.item_idx_tensor = item_idx_tensor.to(self.device)
-        self.item_scr_tensor = item_scr_tensor.to(self.device)
-        self.user_idx_tensor = user_idx_tensor.to(self.device)
-        self.user_scr_tensor = user_scr_tensor.to(self.device)
+        self.item_idx_tensor = item_idx_tensor  # torch.Size([3516, 250])
+        self.item_scr_tensor = item_scr_tensor
+        self.user_idx_tensor = user_idx_tensor  # torch.Size([6031, 250])
+        self.user_scr_tensor = user_scr_tensor
 
-        self.item_emb = item_embedding.to(self.device)  # nn.Embedding(n_items, emb_dim)
-        self.user_emb = user_embedding.to(self.device)  # nn.Embedding(len(unique_uidx), emb_dim)
+        self.item_emb = item_embedding
+        self.user_emb = user_embedding
 
-        # self.inter_input_dim = self.item_emb.embedding_dim
-        # self.inter_lin = InterLin(input_dim=self.inter_input_dim, hidden=self.inter_input_dim//10, output_dim=1)
         self.cat_dim = self.item_emb.embedding_dim * 2
         self.inter_lin = InterLin(input_dim=self.cat_dim,
                                   hidden1=self.cat_dim // 2, hidden2=self.cat_dim // 4,
                                   output_dim=1)
 
     def forward(self, user_idxs, item_idxs):
-        user_neighs = self.user_idx_tensor[user_idxs].to(self.device)
-        # [top_k x multi_factor]
-        neigh_emb = self.user_emb(user_neighs).to(self.device)
-        # [top_k x multi_factor] x embed_dim
-        neigh_score = self.user_scr_tensor[user_neighs].to(self.device)
+        user_neighs = self.user_idx_tensor[user_idxs]
+        # print('user_neighs shape : ', user_neighs.shape)  # torch.Size([3516, 250])
+        neigh_emb = self.user_emb(user_neighs)
+        # print('neigh_emb shape : ', neigh_emb.shape)  # torch.Size([3516, 250, 100])
+        neigh_score = self.user_scr_tensor[user_neighs]
+        # print('neigh_score shape : ', neigh_score.shape)  # torch.Size([3516, 250, 250])
         scored_user_emb = torch.matmul(neigh_score, neigh_emb)
-        # batch_size x [top_k x multi_factor] x embed_dim
-        # user_reshaped = torch.reshape(scored_user_emb, (-1, scored_user_emb.shape[1]*scored_user_emb.shape[2]))
-        # batch_size x [top_k x multi_factor x embed_dim]
+        # print('scored_user_emb shape : ', scored_user_emb.shape)  # torch.Size([3516, 250, 100])
 
-        item_neighs = self.item_idx_tensor[item_idxs].to(self.device)
-        item_neigh_emb = self.item_emb(item_neighs).to(self.device)
-        item_neigh_scr = self.item_scr_tensor[item_neighs].to(self.device)
+        item_neighs = self.item_idx_tensor[item_idxs]
+        # print('item_neighs shape : ', item_neighs.shape)  # torch.Size([3516, 250])
+        item_neigh_emb = self.item_emb(item_neighs)
+        # print('item_neigh_emb shape : ', item_neigh_emb.shape)  # torch.Size([3516, 250, 100])
+        item_neigh_scr = self.item_scr_tensor[item_neighs]
+        # print('item_neigh_scr shape : ', item_neigh_scr.shape)  # torch.Size([3516, 250, 250])
         scored_item_emb = torch.matmul(item_neigh_scr, item_neigh_emb)
-        # item_reshaped = torch.reshape(scored_item_emb, (-1, scored_item_emb.shape[1]*scored_item_emb.shape[2]))
+        # print('scored_item_emb shape : ', scored_item_emb.shape)  # torch.Size([3516, 250, 100])
 
-        interaction_cat = torch.cat((scored_user_emb, scored_item_emb), dim=-1)
-        # print('interaction_cat shape : ', interaction_cat.shape)
-        # batch_size, [multi_factor x top_k], embedding_dim x 2
+        # 여기서 에러 발생하는데, 대체 월요일부터 뭐가 문제인지 몰 것다 -_;;
+        # .to(self.device) 로 GPU 로 보낸 데이터랑, CPU 에 있는 데이터랑 따로 놀아서 생기는 문제;
+        interaction_cat = torch.cat((scored_user_emb, scored_item_emb), 2)
+        # print('interaction_cat : ', interaction_cat)
         result = torch.sigmoid(self.inter_lin(interaction_cat))
-        # batch_size, 1
         return torch.mean(result, dim=-2).squeeze()
-        # pair-wise multiplication for interaction layer
-        # interaction = scored_user_emb * scored_item_emb
-        # print('interaction shape : ', interaction.shape)
-        # batch_size x [top_k x multi_factor] x embed_dim
-        # result = torch.sigmoid(self.inter_lin(interaction))
-        # print('result shape : ', result.shape)
-        # for batch training : torch.Size([500, 100, 1])
-        # for one id evaluation : torch.Size([100, 1])
-        # return torch.mean(result, dim=-2).squeeze()
 
 
 class InterLin(nn.Module):
     def __init__(self, input_dim, hidden1, hidden2, output_dim):
         super(InterLin, self).__init__()
-        # batch_size, [multi_factor x top_k], embedding_dim x 2
-        self.input_dim = input_dim
-        self.hidden1 = hidden1
-        self.hidden2 = hidden2
-        self.output_dim = output_dim
 
         self.ln1 = nn.Linear(input_dim, hidden1)
         self.ln2 = nn.Linear(hidden1, hidden2)
         self.ln3 = nn.Linear(hidden2, output_dim)
-        # batch_size, [multi_factor x top_k], output_dim
 
     def forward(self, x):
         x = F.relu(self.ln1(x))
