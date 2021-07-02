@@ -2,6 +2,7 @@ import os
 import pickle
 import time
 import numpy as np
+import torch
 from sknetwork.ranking import PageRank
 
 from utils import *
