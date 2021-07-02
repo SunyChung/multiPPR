@@ -78,8 +78,8 @@ print('trainable parameters : ', pytorch_total_params)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 
 
-def train(epoch, train_data):
-    print('epoch : ', epoch)
+def train(epoch, train_data, vad_data):
+    print('\nepoch : ', epoch)
     start = time.time()
     print('train batch length : ', len(train_data))
     train_n = len(train_data)
@@ -88,6 +88,7 @@ def train(epoch, train_data):
     optimizer.zero_grad()
     loss = nn.BCELoss()
 
+    loss_list = []
     for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
         # print('batch_num : ', batch_num)
         end_idx = min(st_idx + batch_size, train_n)
@@ -101,45 +102,14 @@ def train(epoch, train_data):
         predictions = model(user_idxs, item_idxs)
         # print('predictions : ', predictions.to('cpu'))
         train_loss = loss(predictions.to('cpu'), targets)
+        loss_list.append(train_loss.detach().to('cpu').numpy())
         # print('train_loss : ', train_loss)
         train_loss.backward()
         optimizer.step()
     print('one epoch takes : ', time.time() - start)
+    print('epoch loss : ', np.mean(loss_list))
     ndcg_list, recall_list = evaluate(vad_data)
     return ndcg_list, recall_list
-
-
-def evaluate(test_data):
-    model.eval()
-    print('evaluation batch length : ', len(test_data))
-    test_n = len(test_data)
-    test_idxlist = list(range(test_n))
-    ndcg_list, recall_list = [], []
-
-    for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
-        end_idx = min(st_idx + batch_size, test_n)
-        user_idxs = test_data[test_idxlist[st_idx:end_idx]][:, 0]
-        item_idxs = test_data[test_idxlist[st_idx:end_idx]][:, 1]
-        predictions = model(user_idxs, item_idxs)
-        targets = test_data[test_idxlist[st_idx:end_idx]][:, 2]
-        ndcg_score = NDCG(predictions, targets, k=100)
-        print('ndcg : ', ndcg_score)
-        ndcg_list.append(ndcg_score)
-        recall_score = RECALL(predictions, targets, k=100)
-        print('recall : ', recall_score)
-        recall_list.append(recall_score)
-    return ndcg_list, recall_list
-
-
-for epoch in range(epochs):
-    ndcg_list, recall_list = train(epoch, train_data)
-    print('mean NDCG : ', np.mean(ndcg_list))
-    print('mean RECALL : ', np.mean(recall_list))
-
-print('test started !')
-ndcg_list, recall_list = evaluate(test_data)
-print('mean NDCG : ', np.mean(ndcg_list))
-print('mean RECALL : ', np.mean(recall_list))
 
 
 def NDCG(predictions, targets, k):
@@ -158,5 +128,38 @@ def RECALL(predictions, targets, k):
     true_binary = targets > 0
     tmp = (np.logical_and(pred_binary, true_binary).sum()).astype(np.float32)
     print('target sum : ', targets.sum())
-    dinorm = np.min(k, targets.sum())
+    dinorm = min(k, targets.sum())
     return tmp / dinorm
+
+def evaluate(test_data):
+    model.eval()
+    # print('evaluation batch length : ', len(test_data))
+    test_n = len(test_data)
+    test_idxlist = list(range(test_n))
+    ndcg_list, recall_list = [], []
+
+    for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
+        end_idx = min(st_idx + batch_size, test_n)
+        user_idxs = test_data[test_idxlist[st_idx:end_idx]][:, 0]
+        item_idxs = test_data[test_idxlist[st_idx:end_idx]][:, 1]
+        predictions = model(user_idxs, item_idxs)
+        targets = test_data[test_idxlist[st_idx:end_idx]][:, 2]
+        ndcg_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=100)
+        print('ndcg : ', ndcg_score)
+        ndcg_list.append(ndcg_score)
+        recall_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=100)
+        print('recall : ', recall_score)
+        recall_list.append(recall_score)
+    return ndcg_list, recall_list
+
+
+for epoch in range(epochs):
+    ndcg_list, recall_list = train(epoch, train_data, vad_data)
+    print('\nmean NDCG : ', np.mean(ndcg_list))
+    print('mean RECALL : ', np.mean(recall_list))
+
+print('test started !')
+ndcg_list, recall_list = evaluate(test_data)
+print('\nmean NDCG : ', np.mean(ndcg_list))
+print('mean RECALL : ', np.mean(recall_list))
+    
