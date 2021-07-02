@@ -11,10 +11,10 @@ def get_bipartite_matrix(data_dir):
     col = df['movieId']
     row = df['userId']
     data = np.ones(len(row), dtype=int)
-    print('max(row) : ', max(row))
-    print('max(col) : ', max(col))
-    print('unique row : ', len(pd.unique(row)))
-    print('unique col : ', len(pd.unique(col)))
+    print('bipartite mat : max(row) = ', max(row))
+    print('bipartite mat : max(col) = ', max(col))
+    print('unique # of row : ', len(pd.unique(row)))
+    print('unique # of col : ', len(pd.unique(col)))
     bi_matrix = csr_matrix((data, (row, col)), shape=(max(row)+1, max(col)+1))
     return bi_matrix
 
