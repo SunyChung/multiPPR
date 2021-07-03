@@ -11,7 +11,7 @@ from model import ContextualizedNN
 from features import PPRfeatures
 from utils import load_all
 
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
@@ -81,7 +81,7 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 def train(epoch, train_data, vad_data):
     print('\nepoch : ', epoch)
     start = time.time()
-    print('train batch length : ', len(train_data))
+    # print('train batch length : ', len(train_data))
     train_n = len(train_data)
     train_idxlist = list(range(train_n))
     model.train()
@@ -107,9 +107,8 @@ def train(epoch, train_data, vad_data):
         train_loss.backward()
         optimizer.step()
     print('one epoch takes : ', time.time() - start)
-    print('epoch loss : ', np.mean(loss_list))
     ndcg_list, recall_list = evaluate(vad_data)
-    return ndcg_list, recall_list
+    return ndcg_list, recall_list, loss_list
 
 
 def NDCG(predictions, targets, k):
@@ -131,6 +130,7 @@ def RECALL(predictions, targets, k):
     dinorm = min(k, targets.sum())
     return tmp / dinorm
 
+
 def evaluate(test_data):
     model.eval()
     # print('evaluation batch length : ', len(test_data))
@@ -145,21 +145,29 @@ def evaluate(test_data):
         predictions = model(user_idxs, item_idxs)
         targets = test_data[test_idxlist[st_idx:end_idx]][:, 2]
         ndcg_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=100)
-        print('ndcg : ', ndcg_score)
+        # print('ndcg : ', ndcg_score)
         ndcg_list.append(ndcg_score)
         recall_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=100)
-        print('recall : ', recall_score)
+        # print('recall : ', recall_score)
         recall_list.append(recall_score)
     return ndcg_list, recall_list
 
 
 for epoch in range(epochs):
-    ndcg_list, recall_list = train(epoch, train_data, vad_data)
-    print('\nmean NDCG : ', np.mean(ndcg_list))
+    ndcg_list, recall_list, loss_list = train(epoch, train_data, vad_data)
+    print('\ntraining evaluation ... ')
+    print('epoch loss : ', np.mean(loss_list))
+    print('mean NDCG : ', np.mean(ndcg_list))
     print('mean RECALL : ', np.mean(recall_list))
+    if epoch == epochs:
+        with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
+            pickle.dump(loss_list, f)
 
-print('test started !')
+print('\ntest started !')
 ndcg_list, recall_list = evaluate(test_data)
-print('\nmean NDCG : ', np.mean(ndcg_list))
+print('mean NDCG : ', np.mean(ndcg_list))
 print('mean RECALL : ', np.mean(recall_list))
-    
+with open(os.path.join(data_dir, 'test_NDCG_with_epoch_' + str(epochs)), 'wb') as f:
+    pickle.dump(ndcg_list, f)
+with open(os.path.join(data_dir, 'test_RECALL_with_epoch_' + str(epochs)), 'wb') as f:
+    pickle.dump(recall_list, f)
