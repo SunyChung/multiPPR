@@ -41,8 +41,6 @@ class ContextualizedNN(nn.Module):
         scored_item_emb = torch.matmul(item_neigh_scr, item_neigh_emb)
         # print('scored_item_emb shape : ', scored_item_emb.shape)  # torch.Size([3516, 250, 100])
 
-        # 여기서 에러 발생하는데, 대체 월요일부터 뭐가 문제인지 몰 것다 -_;;
-        # .to(self.device) 로 GPU 로 보낸 데이터랑, CPU 에 있는 데이터랑 따로 놀아서 생기는 문제;
         interaction_cat = torch.cat((scored_user_emb, scored_item_emb), 2)
         # print('interaction_cat : ', interaction_cat)
         result = torch.sigmoid(self.inter_lin(interaction_cat))
