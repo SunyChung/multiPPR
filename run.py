@@ -11,7 +11,7 @@ from model import ContextualizedNN
 from features import PPRfeatures
 from utils import load_all
 
-# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
@@ -26,7 +26,8 @@ args = parser.parse_args()
 data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
-epochs = args.epochs
+# epochs = args.epochs  #
+epochs = 30
 multi_factor = args.multi_factor
 top_k = args.top_k
 emb_dim = args.emb_dim
@@ -159,7 +160,7 @@ for epoch in range(epochs):
     print('epoch loss : ', np.mean(loss_list))
     print('mean NDCG : ', np.mean(ndcg_list))
     print('mean RECALL : ', np.mean(recall_list))
-    if epoch == epochs:
+    if epoch == (epochs - 1):
         with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
             pickle.dump(loss_list, f)
 
