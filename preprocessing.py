@@ -14,43 +14,50 @@ def get_count(tp, id):
 def filter_triplets(tp, min_sc=0, min_uc=5):
     if min_sc > 0:
         item_count = get_count(tp, 'movieId')
-        tp = tp[tp['movieId'].isin(item_count.index[item_count['size'] >= min_sc])]
+        tp = tp[tp['movieId'].isin(item_count['movieId'][item_count['size'] >= min_sc].to_numpy())]
         print('movieId filtered !')
 
     if min_uc > 0:
         user_count = get_count(tp, 'userId')
-        tp = tp[tp['userId'].isin(user_count.index[user_count['size'] >= min_uc])]
+        tp = tp[tp['userId'].isin(user_count['userId'][user_count['size'] >= min_uc].to_numpy())]
+        # print(tp)
         print('userId filtered!')
-
-    # print('filtered "tp" shape : ', tp.shape)  # (574548, 4)
     user_count, item_count = get_count(tp, 'userId'), get_count(tp, 'movieId')
     return tp, user_count, item_count
 
 
-def data_filtering(data_dir, raw_data):
-    filtered_pd, user_activity, item_popularity = filter_triplets(raw_data)
-    sparsity = 1. * filtered_pd.shape[0] / (user_activity.shape[0] * item_popularity.shape[0])
+def data_filtering(data_dir, tp):
+    tp, user_activity, item_popularity = filter_triplets(tp)
+    sparsity = 1. * tp.shape[0] / (user_activity.shape[0] * item_popularity.shape[0])
     print('after filtering, there are %d watching events from %d users and %d movies (sparsity: %.3f%%)'
-          % (filtered_pd.shape[0], user_activity.shape[0], item_popularity.shape[0], sparsity * 100))
+          % (tp.shape[0], user_activity.shape[0], item_popularity.shape[0], sparsity * 100))
     # ml-1m
-    # after filtering, there are 574548 watching events from 6031 users and 3533 movies (sparsity: 2.696%)
+    # after filtering, there are 575272 watching events
+    # from 6034 users and 3533 movies (sparsity: 2.699%)
     # ml-20m
-    filtered_pd = filtered_pd[['userId', 'movieId']]
+    # after filtering, there are 9990682 watching events
+    # from 136677 users and 20720 movies (sparsity: 0.353%)
+    tp = tp[['userId', 'movieId']]
     with open(os.path.join(data_dir, 'filtered_ratings.csv'), 'w') as f:
-        filtered_pd.to_csv(f, index=False)
-    return filtered_pd, user_activity, item_popularity
+        tp.to_csv(f, index=False)
+    return tp, user_activity, item_popularity
 
 
 if __name__ == '__main__':
-    data_dir = './data/ml-1m'
+    # data_dir = './data/ml-1m'
+    data_dir = './data/ml-20m'
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
     threshold = 3.5
-    n_held_out_users = 500  # for ml-1m
+    # n_held_out_users = 500  # for ml-1m
+    n_held_out_users = 10000  # for ml-20m
+
     test_prop = 0.2
-    raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.dat'), sep='::',
-                            names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
+    # raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.dat'), sep='::',
+    #                        names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
+    raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.csv'))
+
     raw_data = raw_data[raw_data['rating'] > threshold]
     filtered_pd, user_count, item_count = data_filtering(data_dir, raw_data)
 
