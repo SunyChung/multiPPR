@@ -11,7 +11,7 @@ from model import ContextualizedNN
 from features import PPRfeatures
 from utils import load_all
 
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
@@ -27,13 +27,14 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 30
+epochs = 50
 multi_factor = args.multi_factor
-top_k = args.top_k
+# top_k = args.top_k
+top_k = 20
 emb_dim = args.emb_dim
 print('learning rate : ', lr)
-print('epochs : ', epochs)
 print('multi factors : ', multi_factor)
+print('epochs : ', epochs)
 print('top k : ', top_k)
 print('embedding dimension : ', emb_dim)
 
@@ -87,7 +88,8 @@ def train(epoch, train_data, vad_data):
     train_idxlist = list(range(train_n))
     model.train()
     optimizer.zero_grad()
-    loss = nn.BCELoss()
+    # loss = nn.BCELoss()
+    loss = nn.BCEWithLogitsLoss()
 
     loss_list = []
     for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
@@ -114,10 +116,16 @@ def train(epoch, train_data, vad_data):
 
 def NDCG(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
-    topk_pred = predictions[topk_idx]
+    # topk_pred = predictions[topk_idx]
+    # discount 는 숫자 값 하나가 아니고, (2 ~ k+2) range 의 np.array 임
     discount = 1. / np.log2(np.arange(2, k+2))
-    DCG = np.array(topk_pred * discount).sum()
-    IDCG = np.array(discount[:min(len(targets), k)]).sum()
+    # DCG 를 잘못 썼네 -_;
+    # DCG = np.array(topk_pred * discount).sum()
+    DCG = np.array(targets[topk_idx] * discount).sum()
+    # print('DCG : ', DCG)
+    IDCG = discount[:min(targets.sum(), k)].sum()
+    # print('IDCG : ', IDCG)
+    # print('DCG / IDCG : ', DCG / IDCG)
     return DCG / IDCG
 
 
@@ -125,10 +133,14 @@ def RECALL(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
     pred_binary = np.zeros_like(predictions, dtype=bool)
     pred_binary[topk_idx] = True
+    # print('pred_binary : ', pred_binary)
     true_binary = targets > 0
+    # print('true_binary : ', true_binary)
     tmp = (np.logical_and(pred_binary, true_binary).sum()).astype(np.float32)
-    print('target sum : ', targets.sum())
+    # print('tmp : ', tmp)
+    # print('target sum : ', targets.sum())
     dinorm = min(k, targets.sum())
+    # print('dinorm : ', dinorm)
     return tmp / dinorm
 
 
@@ -158,16 +170,16 @@ for epoch in range(epochs):
     ndcg_list, recall_list, loss_list = train(epoch, train_data, vad_data)
     print('\ntraining evaluation ... ')
     print('epoch loss : ', np.mean(loss_list))
-    print('mean NDCG : ', np.mean(ndcg_list))
-    print('mean RECALL : ', np.mean(recall_list))
+    print('mean NDCG@100 : ', np.mean(ndcg_list))
+    print('mean RECALL@100 : ', np.mean(recall_list))
     if epoch == (epochs - 1):
         with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
             pickle.dump(loss_list, f)
 
 print('\ntest started !')
 ndcg_list, recall_list = evaluate(test_data)
-print('mean NDCG : ', np.mean(ndcg_list))
-print('mean RECALL : ', np.mean(recall_list))
+print('mean NDCG@100 : ', np.mean(ndcg_list))
+print('mean RECALL@100 : ', np.mean(recall_list))
 with open(os.path.join(data_dir, 'test_NDCG_with_epoch_' + str(epochs)), 'wb') as f:
     pickle.dump(ndcg_list, f)
 with open(os.path.join(data_dir, 'test_RECALL_with_epoch_' + str(epochs)), 'wb') as f:
