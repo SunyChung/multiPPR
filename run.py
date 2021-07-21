@@ -15,8 +15,8 @@ from utils import load_all
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', type=str, default='./data/ml-1m/')
-parser.add_argument('--learning_rate', type=float, default=1e-4, help='initial learning rate')
-parser.add_argument('--batch_size', type=int, default=512)
+parser.add_argument('--learning_rate', type=float, default=1e-4)
+parser.add_argument('--batch_size', type=int)
 parser.add_argument('--epochs', type=int, default=10)
 parser.add_argument('--multi_factor', type=int, default=5)
 parser.add_argument('--top_k', type=int, default=50)
@@ -30,12 +30,13 @@ lr = args.learning_rate
 epochs = 50
 multi_factor = args.multi_factor
 # top_k = args.top_k
-top_k = 20
-emb_dim = args.emb_dim
+top_k = 15
+# emb_dim = args.emb_dim
+emb_dim = 32
 print('learning rate : ', lr)
 print('multi factors : ', multi_factor)
 print('epochs : ', epochs)
-print('top k : ', top_k)
+print('top_k : ', top_k)
 print('embedding dimension : ', emb_dim)
 
 n_items, train_data, vad_data, test_data = load_all(data_dir)
@@ -110,17 +111,20 @@ def train(epoch, train_data, vad_data):
         train_loss.backward()
         optimizer.step()
     print('one epoch takes : ', time.time() - start)
-    ndcg_list, recall_list = evaluate(vad_data)
-    return ndcg_list, recall_list, loss_list
+    ndcg_100_list, recall_50_list, recall_20_list = evaluate(vad_data)
+    return ndcg_100_list, recall_50_list, recall_20_list, loss_list
 
 
 def NDCG(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
     # topk_pred = predictions[topk_idx]
-    # discount 는 숫자 값 하나가 아니고, (2 ~ k+2) range 의 np.array 임
+    # discount 는 숫자 값 하나가 아니고, (2 ~ k+2) range 의 np.array
     discount = 1. / np.log2(np.arange(2, k+2))
-    # DCG 를 잘못 썼네 -_;
+    # DCG 를 잘못 정의했었음...
     # DCG = np.array(topk_pred * discount).sum()
+    # 이것도 이상한데 ?? topk_idx 는 그냥 1 로 예측하려는 건데,
+    # 만약에 targets 자리가 0 이면 그냥 0 ??
+    # predictions 쓰는 게 맞나 ? ;
     DCG = np.array(targets[topk_idx] * discount).sum()
     # print('DCG : ', DCG)
     IDCG = discount[:min(targets.sum(), k)].sum()
@@ -149,7 +153,7 @@ def evaluate(test_data):
     # print('evaluation batch length : ', len(test_data))
     test_n = len(test_data)
     test_idxlist = list(range(test_n))
-    ndcg_list, recall_list = [], []
+    ndcg_100_list, recall_50_list, recall_20_list = [], [], []
 
     for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
         end_idx = min(st_idx + batch_size, test_n)
@@ -157,30 +161,61 @@ def evaluate(test_data):
         item_idxs = test_data[test_idxlist[st_idx:end_idx]][:, 1]
         predictions = model(user_idxs, item_idxs)
         targets = test_data[test_idxlist[st_idx:end_idx]][:, 2]
-        ndcg_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=100)
-        # print('ndcg : ', ndcg_score)
-        ndcg_list.append(ndcg_score)
-        recall_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=100)
-        # print('recall : ', recall_score)
-        recall_list.append(recall_score)
-    return ndcg_list, recall_list
 
+        ndcg_100_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=100)
+        ndcg_100_list.append(ndcg_100_score)
+        recall_50_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=50)
+        recall_20_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=20)
+        recall_50_list.append(recall_50_score)
+        recall_20_list.append(recall_20_score)
+    return ndcg_100_list, recall_50_list, recall_20_list
 
+all_epoch_max_100_ndcg, all_epoch_max_50_recall, all_epoch_max_20_recall = [], [], []
+# mean_ndcg, mean_recall = [], []
 for epoch in range(epochs):
-    ndcg_list, recall_list, loss_list = train(epoch, train_data, vad_data)
+    ndcg_100_list, recall_50_list, recall_20_list, loss_list = train(epoch, train_data, vad_data)
     print('\ntraining evaluation ... ')
     print('epoch loss : ', np.mean(loss_list))
-    print('mean NDCG@100 : ', np.mean(ndcg_list))
-    print('mean RECALL@100 : ', np.mean(recall_list))
-    if epoch == (epochs - 1):
-        with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
-            pickle.dump(loss_list, f)
+    # mean_ndcg.append(np.mean(ndcg_100_list))
+    print('mean NDCG@100 : ', np.mean(ndcg_100_list))
+    print('max NDCG@100 : ', max(ndcg_100_list))
+    # mean_recall.append(np.mean(recall_50_list))
+    print('mean RECALL@50 : ', np.mean(recall_50_list))
+    print('max RECALL@50 : ', max(recall_50_list))
+    # mean_recall.append(np.mean(recall_20_list))
+    print('mean RECALL@20 : ', np.mean(recall_20_list))
+    print('max RECALL@20 : ', max(recall_20_list))
+
+    all_epoch_max_100_ndcg.append(max(ndcg_100_list))
+    all_epoch_max_50_recall.append(max(recall_50_list))
+    all_epoch_max_20_recall.append(max(recall_20_list))
+print('max NDCG@100 : ', max(all_epoch_max_100_ndcg))
+print('max RECALL@50 : ', max(all_epoch_max_50_recall))
+print('max RECALL@20 : ', max(all_epoch_max_20_recall))
+
+#     if epoch == (epochs - 1):
+#         with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
+#             pickle.dump(loss_list, f)
+# with open(os.path.join(data_dir,
+#                        'mean_NDCG_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
+#     pickle.dump(mean_ndcg, f)
+# with open(os.path.join(data_dir,
+#                        'mean_RECALL_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
+#     pickle.dump(mean_recall, f)
+
 
 print('\ntest started !')
-ndcg_list, recall_list = evaluate(test_data)
-print('mean NDCG@100 : ', np.mean(ndcg_list))
-print('mean RECALL@100 : ', np.mean(recall_list))
-with open(os.path.join(data_dir, 'test_NDCG_with_epoch_' + str(epochs)), 'wb') as f:
-    pickle.dump(ndcg_list, f)
-with open(os.path.join(data_dir, 'test_RECALL_with_epoch_' + str(epochs)), 'wb') as f:
-    pickle.dump(recall_list, f)
+ndcg_100_list, recall_50_list, recall_20_list = evaluate(test_data)
+print('mean NDCG@100 : ', np.mean(ndcg_100_list))
+print('mean RECALL@50 : ', np.mean(recall_50_list))
+print('mean RECALL@20 : ', np.mean(recall_20_list))
+print('\nmax NDCG@100 : ', max(ndcg_100_list))
+print('max RECALL@50 : ', max(recall_50_list))
+print('max RECALL@20 : ', max(recall_20_list))
+
+# with open(os.path.join(data_dir,
+#                        'test_NDCG_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
+#     pickle.dump(ndcg_list, f)
+# with open(os.path.join(data_dir,
+#                        'test_RECALL_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
+#     pickle.dump(recall_list, f)
