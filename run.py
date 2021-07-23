@@ -27,12 +27,12 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 50
+epochs = 10
 multi_factor = args.multi_factor
 # top_k = args.top_k
-top_k = 15
+top_k = 10
 # emb_dim = args.emb_dim
-emb_dim = 32
+emb_dim = 64
 print('learning rate : ', lr)
 print('multi factors : ', multi_factor)
 print('epochs : ', epochs)
@@ -41,7 +41,10 @@ print('embedding dimension : ', emb_dim)
 
 n_items, train_data, vad_data, test_data = load_all(data_dir)
 print('n_items : ', n_items)
+
+# batch size 가 n_items 가 아니면, NDCG 및 RECALL 이 inf, nan 으로 반환됨 -_
 batch_size = n_items
+# batch_size = 500
 print('batch size : ', batch_size)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -75,10 +78,16 @@ user_embedding = nn.Embedding(len(unique_uidx), emb_dim).to(device)
 model = ContextualizedNN(item_idx_tensor, item_scr_tensor,
                          user_idx_tensor, user_scr_tensor,
                          item_embedding, user_embedding).to(device)
+print('\n')
 print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
-optimizer = optim.Adam(model.parameters(), lr=lr)
+# optimizer = optim.Adam(model.parameters(), lr=lr)
+optimizer = optim.RMSprop(model.parameters(), lr=lr)
+loss = nn.BCELoss()
+# loss = nn.BCEWithLogitsLoss()
+print('optimizer : ', optimizer)
+print('loss function : ', loss)
 
 
 def train(epoch, train_data, vad_data):
@@ -89,8 +98,6 @@ def train(epoch, train_data, vad_data):
     train_idxlist = list(range(train_n))
     model.train()
     optimizer.zero_grad()
-    # loss = nn.BCELoss()
-    loss = nn.BCEWithLogitsLoss()
 
     loss_list = []
     for batch_num, st_idx in enumerate(range(0, train_n, batch_size)):
@@ -120,19 +127,15 @@ def NDCG(predictions, targets, k):
     # topk_pred = predictions[topk_idx]
     # discount 는 숫자 값 하나가 아니고, (2 ~ k+2) range 의 np.array
     discount = 1. / np.log2(np.arange(2, k+2))
-    # DCG 를 잘못 정의했었음...
-    # DCG = np.array(topk_pred * discount).sum()
-    # 이것도 이상한데 ?? topk_idx 는 그냥 1 로 예측하려는 건데,
-    # 만약에 targets 자리가 0 이면 그냥 0 ??
-    # predictions 쓰는 게 맞나 ? ;
-    DCG = np.array(targets[topk_idx] * discount).sum()
+    # DCG = np.array(targets[topk_idx] * discount).sum()
+    DCG = np.array(predictions[topk_idx] * discount).sum()
     # print('DCG : ', DCG)
     IDCG = discount[:min(targets.sum(), k)].sum()
     # print('IDCG : ', IDCG)
     # print('DCG / IDCG : ', DCG / IDCG)
     return DCG / IDCG
 
-
+# 이 정의가 맞는건지?
 def RECALL(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
     pred_binary = np.zeros_like(predictions, dtype=bool)
@@ -170,28 +173,25 @@ def evaluate(test_data):
         recall_20_list.append(recall_20_score)
     return ndcg_100_list, recall_50_list, recall_20_list
 
-all_epoch_max_100_ndcg, all_epoch_max_50_recall, all_epoch_max_20_recall = [], [], []
-# mean_ndcg, mean_recall = [], []
+# all_epoch_max_100_ndcg, all_epoch_max_50_recall, all_epoch_max_20_recall = [], [], []
 for epoch in range(epochs):
     ndcg_100_list, recall_50_list, recall_20_list, loss_list = train(epoch, train_data, vad_data)
     print('\ntraining evaluation ... ')
     print('epoch loss : ', np.mean(loss_list))
-    # mean_ndcg.append(np.mean(ndcg_100_list))
     print('mean NDCG@100 : ', np.mean(ndcg_100_list))
-    print('max NDCG@100 : ', max(ndcg_100_list))
-    # mean_recall.append(np.mean(recall_50_list))
     print('mean RECALL@50 : ', np.mean(recall_50_list))
-    print('max RECALL@50 : ', max(recall_50_list))
-    # mean_recall.append(np.mean(recall_20_list))
     print('mean RECALL@20 : ', np.mean(recall_20_list))
-    print('max RECALL@20 : ', max(recall_20_list))
 
-    all_epoch_max_100_ndcg.append(max(ndcg_100_list))
-    all_epoch_max_50_recall.append(max(recall_50_list))
-    all_epoch_max_20_recall.append(max(recall_20_list))
-print('max NDCG@100 : ', max(all_epoch_max_100_ndcg))
-print('max RECALL@50 : ', max(all_epoch_max_50_recall))
-print('max RECALL@20 : ', max(all_epoch_max_20_recall))
+    # print('max NDCG@100 : ', max(ndcg_100_list))
+    # print('max RECALL@50 : ', max(recall_50_list))
+    # print('max RECALL@20 : ', max(recall_20_list))
+
+#     all_epoch_max_100_ndcg.append(max(ndcg_100_list))
+#     all_epoch_max_50_recall.append(max(recall_50_list))
+#     all_epoch_max_20_recall.append(max(recall_20_list))
+# print('\nepoch max NDCG@100 : ', max(all_epoch_max_100_ndcg))
+# print('epoch max RECALL@50 : ', max(all_epoch_max_50_recall))
+# print('epoch max RECALL@20 : ', max(all_epoch_max_20_recall))
 
 #     if epoch == (epochs - 1):
 #         with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
@@ -219,3 +219,10 @@ print('max RECALL@20 : ', max(recall_20_list))
 # with open(os.path.join(data_dir,
 #                        'test_RECALL_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
 #     pickle.dump(recall_list, f)
+
+print('final item_emb min : ', torch.min(item_embedding.weight))
+print('final item_emb mean : ', torch.mean(item_embedding.weight))
+print('final item_emb max : ', torch.max(item_embedding.weight))
+print('final user_emb min : ', torch.min(user_embedding.weight))
+print('final user_emb mean : ', torch.mean(user_embedding.weight))
+print('final user_emb max : ', torch.max(user_embedding.weight))
