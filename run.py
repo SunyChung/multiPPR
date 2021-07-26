@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from model import ContextualizedNN
 from features import PPRfeatures
@@ -27,7 +28,7 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 10
+epochs = 5
 multi_factor = args.multi_factor
 # top_k = args.top_k
 top_k = 10
@@ -82,8 +83,8 @@ print('\n')
 print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
-# optimizer = optim.Adam(model.parameters(), lr=lr)
-optimizer = optim.RMSprop(model.parameters(), lr=lr)
+optimizer = optim.Adam(model.parameters(), lr=lr)
+# optimizer = optim.RMSprop(model.parameters(), lr=lr)
 loss = nn.BCELoss()
 # loss = nn.BCEWithLogitsLoss()
 print('optimizer : ', optimizer)
@@ -118,36 +119,26 @@ def train(epoch, train_data, vad_data):
         train_loss.backward()
         optimizer.step()
     print('one epoch takes : ', time.time() - start)
-    ndcg_100_list, recall_50_list, recall_20_list = evaluate(vad_data)
-    return ndcg_100_list, recall_50_list, recall_20_list, loss_list
+    ndcg_100_list, recall_100_list, recall_50_list, recall_20_list = evaluate(vad_data)
+    return ndcg_100_list, recall_100_list, recall_50_list, recall_20_list, loss_list
 
 
 def NDCG(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
-    # topk_pred = predictions[topk_idx]
-    # discount 는 숫자 값 하나가 아니고, (2 ~ k+2) range 의 np.array
     discount = 1. / np.log2(np.arange(2, k+2))
     # DCG = np.array(targets[topk_idx] * discount).sum()
     DCG = np.array(predictions[topk_idx] * discount).sum()
-    # print('DCG : ', DCG)
     IDCG = discount[:min(targets.sum(), k)].sum()
-    # print('IDCG : ', IDCG)
-    # print('DCG / IDCG : ', DCG / IDCG)
     return DCG / IDCG
 
-# 이 정의가 맞는건지?
+
 def RECALL(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
     pred_binary = np.zeros_like(predictions, dtype=bool)
     pred_binary[topk_idx] = True
-    # print('pred_binary : ', pred_binary)
     true_binary = targets > 0
-    # print('true_binary : ', true_binary)
     tmp = (np.logical_and(pred_binary, true_binary).sum()).astype(np.float32)
-    # print('tmp : ', tmp)
-    # print('target sum : ', targets.sum())
     dinorm = min(k, targets.sum())
-    # print('dinorm : ', dinorm)
     return tmp / dinorm
 
 
@@ -156,7 +147,7 @@ def evaluate(test_data):
     # print('evaluation batch length : ', len(test_data))
     test_n = len(test_data)
     test_idxlist = list(range(test_n))
-    ndcg_100_list, recall_50_list, recall_20_list = [], [], []
+    ndcg_100_list, recall_100_list, recall_50_list, recall_20_list = [], [], [], []
 
     for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
         end_idx = min(st_idx + batch_size, test_n)
@@ -167,31 +158,75 @@ def evaluate(test_data):
 
         ndcg_100_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=100)
         ndcg_100_list.append(ndcg_100_score)
+        recall_100_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=100)
+        recall_100_list.append(recall_100_score)
         recall_50_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=50)
-        recall_20_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=20)
         recall_50_list.append(recall_50_score)
+        recall_20_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=20)
         recall_20_list.append(recall_20_score)
-    return ndcg_100_list, recall_50_list, recall_20_list
+    return ndcg_100_list, recall_100_list, recall_50_list, recall_20_list
 
-# all_epoch_max_100_ndcg, all_epoch_max_50_recall, all_epoch_max_20_recall = [], [], []
+mean_epoch_loss, mean_ndcg_100, mean_recall_100, mean_recall_50, mean_recall_20 = [], [], [], [], []
+std_epoch_loss, std_ndcg_100, std_recall_100, std_recall_50, std_recall_20 = [], [], [], [], []
 for epoch in range(epochs):
-    ndcg_100_list, recall_50_list, recall_20_list, loss_list = train(epoch, train_data, vad_data)
+    ndcg_100_list, recall_100_list, recall_50_list, recall_20_list, loss_list \
+        = train(epoch, train_data, vad_data)
     print('\ntraining evaluation ... ')
-    print('epoch loss : ', np.mean(loss_list))
+    print('mean epoch loss : ', np.mean(loss_list))
+    # print('epoch loss std : ', np.std(loss_list))
+    mean_epoch_loss.append(np.mean(loss_list))
+    std_epoch_loss.append(np.std(loss_list))
     print('mean NDCG@100 : ', np.mean(ndcg_100_list))
+    # print('NDCG@100 std : ', np.std(ndcg_100_list))
+    mean_ndcg_100.append(np.mean(ndcg_100_list))
+    std_ndcg_100.append(np.std(ndcg_100_list))
+    print('mean RECALL@100 : ', np.mean(recall_100_list))
+    mean_recall_100.append(np.mean(recall_100_list))
+    std_recall_100.append(np.std(recall_100_list))
     print('mean RECALL@50 : ', np.mean(recall_50_list))
+    # print('RECALL@50 std : ', np.std(recall_50_list))
+    mean_recall_50.append(np.mean(recall_50_list))
+    std_recall_50.append(np.std(recall_50_list))
     print('mean RECALL@20 : ', np.mean(recall_20_list))
+    # print('RECALL@20 std : ', np.std(recall_20_list))
+    mean_recall_20.append(np.mean(recall_20_list))
+    std_recall_20.append(np.std(recall_20_list))
 
-    # print('max NDCG@100 : ', max(ndcg_100_list))
-    # print('max RECALL@50 : ', max(recall_50_list))
-    # print('max RECALL@20 : ', max(recall_20_list))
+out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
+          + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
+if not os.path.exists(out_dir):
+    os.makedirs(out_dir)
 
-#     all_epoch_max_100_ndcg.append(max(ndcg_100_list))
-#     all_epoch_max_50_recall.append(max(recall_50_list))
-#     all_epoch_max_20_recall.append(max(recall_20_list))
-# print('\nepoch max NDCG@100 : ', max(all_epoch_max_100_ndcg))
-# print('epoch max RECALL@50 : ', max(all_epoch_max_50_recall))
-# print('epoch max RECALL@20 : ', max(all_epoch_max_20_recall))
+def result_plot(epochs, results, plot_label, y_label, save_name):
+    plt.plot(epochs, results, label=plot_label)
+    plt.xlabel('epochs')
+    plt.ylabel(y_label)
+    plt.savefig(save_name)
+
+epoch_range = range(1, epochs+1)
+result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
+            plot_label='mean epoch loss', y_label='mean loss',
+            save_name=out_dir + 'mean_loss.png')
+plt.show()
+result_plot(np.array(epoch_range), np.array(mean_ndcg_100),
+            plot_label='mean NDCG@100', y_label='NDCE@100',
+            save_name=out_dir + 'mean_NDCE_100.png')
+plt.show()
+
+result_plot(np.array(epoch_range), np.array(mean_recall_100),
+            plot_label='mean recall@100', y_label='RECALL@100',
+            save_name=out_dir + 'mean_recall_100.png')
+plt.show()
+
+result_plot(np.array(epoch_range), np.array(mean_recall_50),
+            plot_label='mean recall@50', y_label='RECALL@50',
+            save_name=out_dir + 'mean_recall_50.png')
+plt.show()
+
+result_plot(np.array(epoch_range), np.array(mean_recall_50),
+            plot_label='mean recall@20', y_label='RECALL@20',
+            save_name=out_dir + 'mean_recall_20.png')
+plt.show()
 
 #     if epoch == (epochs - 1):
 #         with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
@@ -205,13 +240,11 @@ for epoch in range(epochs):
 
 
 print('\ntest started !')
-ndcg_100_list, recall_50_list, recall_20_list = evaluate(test_data)
+ndcg_100_list, recall_100_list, recall_50_list, recall_20_list = evaluate(test_data)
 print('mean NDCG@100 : ', np.mean(ndcg_100_list))
+print('mean RECALL@100 : ', np.mean(recall_100_list))
 print('mean RECALL@50 : ', np.mean(recall_50_list))
 print('mean RECALL@20 : ', np.mean(recall_20_list))
-print('\nmax NDCG@100 : ', max(ndcg_100_list))
-print('max RECALL@50 : ', max(recall_50_list))
-print('max RECALL@20 : ', max(recall_20_list))
 
 # with open(os.path.join(data_dir,
 #                        'test_NDCG_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
