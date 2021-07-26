@@ -14,9 +14,9 @@ class ContextualizedNN(nn.Module):
         self.user_idx_tensor = user_idx_tensor  # torch.Size([6034, multi_factor x # of neighbors])
         self.user_scr_tensor = user_scr_tensor
 
-        # print('\ndefault weight initialization')
+        print('\ndefault weight initialization')
         # print('\nusing xavier_normal_ weight initialization')
-        print('\n kaiming_normal_ weight initialization')
+        # print('\n kaiming_normal_ weight initialization')
 
         self.item_emb = item_embedding
         # print('item_emb : ', self.item_emb.weight)
@@ -25,7 +25,7 @@ class ContextualizedNN(nn.Module):
         print('item_emb max : ', torch.max(self.item_emb.weight))
         # nn.init.xavier_normal_(self.item_emb.weight)
         # print('item_emb initialized : ', self.item_emb.weight)
-        nn.init.kaiming_normal_(self.item_emb.weight)
+        # nn.init.kaiming_normal_(self.item_emb.weight)
 
         self.user_emb = user_embedding
         # print('user_emb : ', self.user_emb.weight)
@@ -34,7 +34,7 @@ class ContextualizedNN(nn.Module):
         print('user_emb max : ', torch.max(self.user_emb.weight))
         # nn.init.xavier_normal_(self.user_emb.weight)
         # print('user_emb initialized : ', self.user_emb.weight)
-        nn.init.kaiming_normal_(self.user_emb.weight)
+        # nn.init.kaiming_normal_(self.user_emb.weight)
 
 
         self.cat_dim = self.item_emb.embedding_dim * 2
@@ -87,6 +87,7 @@ class ContextualizedNN(nn.Module):
         # torch.Size([3515(=batch_size), multi_factor, # of neighbors, multi_factor x # of neighbors])
 
         # neigh_score 랑 embedding 곱하는 거 외에, neigh scored emb 를 target 으로 aggregate 해야 함 !
+        # 근데, 다시 생각해 보면, 그럴 필요도 없음 ...
         scored_user_emb = torch.matmul(neigh_score, neigh_emb)
         # torch.Size([3515(=batch_size), multi_factor x # of neighbors, embedding_dim])
 
