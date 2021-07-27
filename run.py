@@ -28,10 +28,10 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 5
+epochs = 20
 multi_factor = args.multi_factor
 # top_k = args.top_k
-top_k = 10
+top_k = 20
 # emb_dim = args.emb_dim
 emb_dim = 64
 print('learning rate : ', lr)
@@ -83,8 +83,8 @@ print('\n')
 print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
-optimizer = optim.Adam(model.parameters(), lr=lr)
-# optimizer = optim.RMSprop(model.parameters(), lr=lr)
+# optimizer = optim.Adam(model.parameters(), lr=lr)
+optimizer = optim.RMSprop(model.parameters(), lr=lr)
 loss = nn.BCELoss()
 # loss = nn.BCEWithLogitsLoss()
 print('optimizer : ', optimizer)
@@ -193,39 +193,56 @@ for epoch in range(epochs):
     std_recall_20.append(np.std(recall_20_list))
 
 out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
-          + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
+          + '_loss_BCE' + '_optim_RMSprop' + '_init_default/'
+        # + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
 
-def result_plot(epochs, results, plot_label, y_label, save_name):
+def result_plot(epochs, results, plot_label, y_label, save_name, title_label):
     plt.plot(epochs, results, label=plot_label)
     plt.xlabel('epochs')
     plt.ylabel(y_label)
+    plt.title(title_label)
     plt.savefig(save_name)
 
 epoch_range = range(1, epochs+1)
 result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
             plot_label='mean epoch loss', y_label='mean loss',
-            save_name=out_dir + 'mean_loss.png')
+            save_name=out_dir + 'mean_loss.png',
+            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
+                        + '_emb_' + str(emb_dim)
+                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
 plt.show()
 result_plot(np.array(epoch_range), np.array(mean_ndcg_100),
             plot_label='mean NDCG@100', y_label='NDCE@100',
-            save_name=out_dir + 'mean_NDCE_100.png')
+            save_name=out_dir + 'mean_NDCE_100.png',
+            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
+                        + '_emb_' + str(emb_dim)
+                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
 plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_100),
             plot_label='mean recall@100', y_label='RECALL@100',
-            save_name=out_dir + 'mean_recall_100.png')
+            save_name=out_dir + 'mean_recall_100.png',
+            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
+                        + '_emb_' + str(emb_dim)
+                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
 plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
             plot_label='mean recall@50', y_label='RECALL@50',
-            save_name=out_dir + 'mean_recall_50.png')
+            save_name=out_dir + 'mean_recall_50.png',
+            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
+                        + '_emb_' + str(emb_dim)
+                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
 plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
             plot_label='mean recall@20', y_label='RECALL@20',
-            save_name=out_dir + 'mean_recall_20.png')
+            save_name=out_dir + 'mean_recall_20.png',
+            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
+                        + '_emb_' + str(emb_dim)
+                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
 plt.show()
 
 #     if epoch == (epochs - 1):
