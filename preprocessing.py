@@ -44,19 +44,19 @@ def data_filtering(data_dir, tp):
 
 
 if __name__ == '__main__':
-    # data_dir = './data/ml-1m'
-    data_dir = './data/ml-20m'
+    data_dir = './data/ml-1m'
+    # data_dir = './data/ml-20m'
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
     threshold = 3.5
-    # n_held_out_users = 500  # for ml-1m
-    n_held_out_users = 10000  # for ml-20m
+    n_held_out_users = 500  # for ml-1m
+    # n_held_out_users = 10000  # for ml-20m
 
     test_prop = 0.2
-    # raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.dat'), sep='::',
-    #                        names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
-    raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.csv'))
+    raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.dat'), sep='::',
+                           names=['userId', 'movieId', 'rating', 'timestamp'], engine='python')
+    # raw_data = pd.read_csv(os.path.join(data_dir, 'ratings.csv'))
 
     raw_data = raw_data[raw_data['rating'] > threshold]
     filtered_pd, user_count, item_count = data_filtering(data_dir, raw_data)
