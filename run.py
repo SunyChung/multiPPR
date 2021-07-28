@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import matplotlib.pylab as pylab
 
 from model import ContextualizedNN
 from features import PPRfeatures
@@ -28,7 +29,7 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 20
+epochs = 2
 multi_factor = args.multi_factor
 # top_k = args.top_k
 top_k = 30
@@ -165,6 +166,7 @@ def evaluate(test_data):
         recall_20_list.append(recall_20_score)
     return ndcg_100_list, recall_100_list, recall_50_list, recall_20_list
 
+
 mean_epoch_loss, mean_ndcg_100, mean_recall_100, mean_recall_50, mean_recall_20 = [], [], [], [], []
 std_epoch_loss, std_ndcg_100, std_recall_100, std_recall_50, std_recall_20 = [], [], [], [], []
 for epoch in range(epochs):
@@ -191,18 +193,27 @@ for epoch in range(epochs):
     mean_recall_20.append(np.mean(recall_20_list))
     std_recall_20.append(np.std(recall_20_list))
 
-out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
-          + '_loss_BCE' + '_optim_RMSprop' + 'kaiming_normal_/'
+# out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
+#           + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
         # + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
+out_dir = './ex/'
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
 
 def result_plot(epochs, results, plot_label, y_label, save_name, title_label):
     plt.plot(epochs, results, label=plot_label)
+    params = {'legend.fontsize': 'small',
+              'figure.figsize': (3, 2),
+              'axes.labelsize': 'x-small',
+              'axes.titlesize': 'x-small',
+              'xtick.labelsize': 'small',
+              'ytick.labelsize': 'small'}
+    pylab.rcParams.update(params)
     plt.xlabel('epochs')
     plt.ylabel(y_label)
     plt.title(title_label)
     plt.savefig(save_name)
+    plt.show()
 
 epoch_range = range(1, epochs+1)
 result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
@@ -211,14 +222,14 @@ result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
                         + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-plt.show()
+
 result_plot(np.array(epoch_range), np.array(mean_ndcg_100),
             plot_label='mean NDCG@100', y_label='NDCE@100',
             save_name=out_dir + 'mean_NDCE_100.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
                         + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-plt.show()
+# plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_100),
             plot_label='mean recall@100', y_label='RECALL@100',
@@ -226,7 +237,7 @@ result_plot(np.array(epoch_range), np.array(mean_recall_100),
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
                         + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-plt.show()
+# plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
             plot_label='mean recall@50', y_label='RECALL@50',
@@ -234,7 +245,7 @@ result_plot(np.array(epoch_range), np.array(mean_recall_50),
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
                         + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-plt.show()
+# plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
             plot_label='mean recall@20', y_label='RECALL@20',
@@ -242,18 +253,7 @@ result_plot(np.array(epoch_range), np.array(mean_recall_50),
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
                         + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-plt.show()
-
-#     if epoch == (epochs - 1):
-#         with open(os.path.join(data_dir, 'train_loss_with_epoch_' + str(epochs)), 'wb') as f:
-#             pickle.dump(loss_list, f)
-# with open(os.path.join(data_dir,
-#                        'mean_NDCG_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
-#     pickle.dump(mean_ndcg, f)
-# with open(os.path.join(data_dir,
-#                        'mean_RECALL_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
-#     pickle.dump(mean_recall, f)
-
+# plt.show()
 
 print('\ntest started !')
 ndcg_100_list, recall_100_list, recall_50_list, recall_20_list = evaluate(test_data)
@@ -261,13 +261,6 @@ print('mean NDCG@100 : ', np.mean(ndcg_100_list))
 print('mean RECALL@100 : ', np.mean(recall_100_list))
 print('mean RECALL@50 : ', np.mean(recall_50_list))
 print('mean RECALL@20 : ', np.mean(recall_20_list))
-
-# with open(os.path.join(data_dir,
-#                        'test_NDCG_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
-#     pickle.dump(ndcg_list, f)
-# with open(os.path.join(data_dir,
-#                        'test_RECALL_with_top_' + str(top_k) + '_epochs_' + str(epochs)), 'wb') as f:
-#     pickle.dump(recall_list, f)
 
 print('final item_emb min : ', torch.min(item_embedding.weight))
 print('final item_emb mean : ', torch.mean(item_embedding.weight))
