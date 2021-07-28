@@ -31,7 +31,7 @@ lr = args.learning_rate
 epochs = 20
 multi_factor = args.multi_factor
 # top_k = args.top_k
-top_k = 20
+top_k = 30
 # emb_dim = args.emb_dim
 emb_dim = 64
 print('learning rate : ', lr)
@@ -126,8 +126,7 @@ def train(epoch, train_data, vad_data):
 def NDCG(predictions, targets, k):
     topk_idx = np.argsort(predictions)[::-1][:k]
     discount = 1. / np.log2(np.arange(2, k+2))
-    # DCG = np.array(targets[topk_idx] * discount).sum()
-    DCG = np.array(predictions[topk_idx] * discount).sum()
+    DCG = np.array(targets[topk_idx] * discount).sum()
     IDCG = discount[:min(targets.sum(), k)].sum()
     return DCG / IDCG
 
@@ -193,7 +192,7 @@ for epoch in range(epochs):
     std_recall_20.append(np.std(recall_20_list))
 
 out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
-          + '_loss_BCE' + '_optim_RMSprop' + '_init_default/'
+          + '_loss_BCE' + '_optim_RMSprop' + 'kaiming_normal_/'
         # + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
@@ -211,14 +210,14 @@ result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
             save_name=out_dir + 'mean_loss.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
+                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
 plt.show()
 result_plot(np.array(epoch_range), np.array(mean_ndcg_100),
             plot_label='mean NDCG@100', y_label='NDCE@100',
             save_name=out_dir + 'mean_NDCE_100.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
+                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
 plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_100),
@@ -226,7 +225,7 @@ result_plot(np.array(epoch_range), np.array(mean_recall_100),
             save_name=out_dir + 'mean_recall_100.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
+                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
 plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
@@ -234,7 +233,7 @@ result_plot(np.array(epoch_range), np.array(mean_recall_50),
             save_name=out_dir + 'mean_recall_50.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
+                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
 plt.show()
 
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
@@ -242,7 +241,7 @@ result_plot(np.array(epoch_range), np.array(mean_recall_50),
             save_name=out_dir + 'mean_recall_20.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + '_init_default')
+                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
 plt.show()
 
 #     if epoch == (epochs - 1):
