@@ -29,10 +29,10 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 2
+epochs = 20
 multi_factor = args.multi_factor
 # top_k = args.top_k
-top_k = 30
+top_k = 10
 # emb_dim = args.emb_dim
 emb_dim = 64
 print('learning rate : ', lr)
@@ -193,16 +193,16 @@ for epoch in range(epochs):
     mean_recall_20.append(np.mean(recall_20_list))
     std_recall_20.append(np.std(recall_20_list))
 
-# out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
-#           + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
-        # + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
-out_dir = './ex/'
+out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
+          + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
+          # + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
+# out_dir = './ex/'
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
 
 def result_plot(epochs, results, plot_label, y_label, save_name, title_label):
     params = {'legend.fontsize': 'small',
-              'figure.figsize': (4, 3),
+              'figure.figsize': (3.5, 2.5),
               'axes.labelsize': 'x-small',
               'axes.titlesize': 'x-small',
               'xtick.labelsize': 'xx-small',
@@ -265,7 +265,10 @@ print('mean RECALL@20 : ', np.mean(recall_20_list))
 
 print('final item_emb min : ', torch.min(item_embedding.weight))
 print('final item_emb mean : ', torch.mean(item_embedding.weight))
+print('final item_emb std : ', torch.std(item_embedding.weight))
 print('final item_emb max : ', torch.max(item_embedding.weight))
-print('final user_emb min : ', torch.min(user_embedding.weight))
+
+print('\nfinal user_emb min : ', torch.min(user_embedding.weight))
 print('final user_emb mean : ', torch.mean(user_embedding.weight))
+print('final user_emb std : ', torch.std(user_embedding.weight))
 print('final user_emb max : ', torch.max(user_embedding.weight))
