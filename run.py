@@ -201,14 +201,15 @@ if not os.path.exists(out_dir):
     os.makedirs(out_dir)
 
 def result_plot(epochs, results, plot_label, y_label, save_name, title_label):
-    plt.plot(epochs, results, label=plot_label)
     params = {'legend.fontsize': 'small',
-              'figure.figsize': (3, 2),
+              'figure.figsize': (4, 3),
               'axes.labelsize': 'x-small',
               'axes.titlesize': 'x-small',
-              'xtick.labelsize': 'small',
-              'ytick.labelsize': 'small'}
+              'xtick.labelsize': 'xx-small',
+              'ytick.labelsize': 'xx-small'}
+    plt.rcParams['figure.constrained_layout.use'] = True
     pylab.rcParams.update(params)
+    plt.plot(epochs, results, label=plot_label)
     plt.xlabel('epochs')
     plt.ylabel(y_label)
     plt.title(title_label)
