@@ -9,7 +9,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 
-from model import ContextualizedNN
+from linear_model import ContextualizedNN
 from cnn_model import FeatureEmb
 from features import PPRfeatures
 from utils import load_all
@@ -30,10 +30,10 @@ data_dir = args.data_dir
 lr = args.learning_rate
 # batch_size = args.batch_size
 # epochs = args.epochs  #
-epochs = 10
+epochs = 50
 multi_factor = args.multi_factor
 # top_k = args.top_k
-top_k = 20
+top_k = 30
 # emb_dim = args.emb_dim
 emb_dim = 64
 print('learning rate : ', lr)
@@ -78,17 +78,18 @@ with open(os.path.join(data_dir, 'unique_uidx'), 'rb') as f:
 item_embedding = nn.Embedding(n_items, emb_dim).to(device)
 user_embedding = nn.Embedding(len(unique_uidx), emb_dim).to(device)
 
-# model = ContextualizedNN(item_idx_tensor, item_scr_tensor,
-#                          user_idx_tensor, user_scr_tensor,
-#                          item_embedding, user_embedding).to(device)
+model = ContextualizedNN(item_idx_tensor, item_scr_tensor,
+                        user_idx_tensor, user_scr_tensor,
+                        item_embedding, user_embedding,
+                        multi_factor, top_k).to(device)
 
-model = FeatureEmb(item_idx_tensor, item_scr_tensor,
-                  user_idx_tensor, user_scr_tensor,
-                  item_embedding, user_embedding,
-                  n_items, top_k, multi_factor, emb_dim).to(device)
+# model = FeatureEmb(item_idx_tensor, item_scr_tensor,
+#                  user_idx_tensor, user_scr_tensor,
+#                  item_embedding, user_embedding,
+#                  n_items, top_k, multi_factor, emb_dim).to(device)
 
 print('\n')
-# print(model)
+print(model)
 pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('trainable parameters : ', pytorch_total_params)
 # print('model parameters : ', model.parameters())
@@ -121,24 +122,17 @@ def train(epoch, train_data, vad_data):
         # print('targets : ', targets)  # tensor([0., 0., 0.,  ..., 0., 0., 0.])
         # print('target shape : ', targets.shape)  # torch.Size([3515])
         predictions = model(user_idxs, item_idxs)
-        print('predictions : ', predictions)
+        # print('predictions : ', predictions)
         train_loss = loss(predictions.to('cpu'), targets)
-        print('train_loss : ', train_loss)
+        # print('train_loss : ', train_loss)
         loss_list.append(train_loss.detach().to('cpu').numpy())
         # print('train_loss : ', train_loss)
         train_loss.backward()
-        # RuntimeError: one of the variables needed for gradient computation
-        # has been modified by an inplace operation:
-        # [torch.cuda.FloatTensor [1, 1, 5, 5]],
-        # which is output 0 of UnsqueezeBackward1, is at version 7030;
-        # expected version 7028 instead.
-        # Hint: enable anomaly detection to find the operation that failed to compute its gradient,
-        # with torch.autograd.set_detect_anomaly(True).
         optimizer.step()
     print('one epoch takes : ', time.time() - start)
-    ndcg_100_list, ndcg_all, recall_all, recall_100_list, recall_50_list, recall_20_list \
+    ndcg_100_list, recall_100_list, recall_50_list, recall_20_list \
         = evaluate(vad_data)
-    return ndcg_100_list, ndcg_all, recall_all, recall_100_list, recall_50_list, recall_20_list, loss_list
+    return ndcg_100_list, recall_100_list, recall_50_list, recall_20_list, loss_list
 
 
 def NDCG(predictions, targets, k):
@@ -164,8 +158,8 @@ def evaluate(test_data):
     # print('evaluation batch length : ', len(test_data))
     test_n = len(test_data)
     test_idxlist = list(range(test_n))
-    ndcg_100_list, ndcg_all, recall_all, recall_100_list, recall_50_list, recall_20_list\
-        = [], [], [], [], [], []
+    ndcg_100_list, recall_100_list, recall_50_list, recall_20_list\
+        = [], [], [], []
 
     for batch_num, st_idx in enumerate(range(0, test_n, batch_size)):
         end_idx = min(st_idx + batch_size, test_n)
@@ -176,37 +170,31 @@ def evaluate(test_data):
 
         ndcg_100_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=100)
         ndcg_100_list.append(ndcg_100_score)
-        ndcg_all_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=n_items)
-        ndcg_all.append(ndcg_all_score)
-        recall_all_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=n_items)
-        recall_all.append(recall_all_score)
+        # ndcg_all_score = NDCG(predictions.detach().to('cpu').numpy(), targets, k=n_items)
+        # ndcg_all.append(ndcg_all_score)
+        # recall_all_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=n_items)
+        # recall_all.append(recall_all_score)
         recall_100_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=100)
         recall_100_list.append(recall_100_score)
         recall_50_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=50)
         recall_50_list.append(recall_50_score)
         recall_20_score = RECALL(predictions.detach().to('cpu').numpy(), targets, k=20)
         recall_20_list.append(recall_20_score)
-    return ndcg_100_list, ndcg_all, recall_all, recall_100_list, recall_50_list, recall_20_list
+    return ndcg_100_list, recall_100_list, recall_50_list, recall_20_list
 
 
-mean_epoch_loss, mean_ndcg_100, mean_ndcg_all, \
-mean_recall_all, mean_recall_100, mean_recall_50, mean_recall_20 \
-    = [], [], [], [], [], [], []
+mean_epoch_loss, mean_ndcg_100, \
+mean_recall_100, mean_recall_50, mean_recall_20 \
+    = [], [], [], [], []
 # std_epoch_loss, std_ndcg_100, std_recall_100, std_recall_50, std_recall_20 = [], [], [], [], []
 for epoch in range(epochs):
-    ndcg_100_list, ndcg_all, recall_all, \
-    recall_100_list, recall_50_list, recall_20_list, loss_list \
+    ndcg_100_list, recall_100_list, recall_50_list, recall_20_list, loss_list \
         = train(epoch, train_data, vad_data)
     print('\ntraining evaluation ... ')
     print('mean epoch loss : ', np.mean(loss_list))
     mean_epoch_loss.append(np.mean(loss_list))
     print('mean NDCG@100 : ', np.mean(ndcg_100_list))
     mean_ndcg_100.append(np.mean(ndcg_100_list))
-
-    print('mean NDCG@all items : ', np.mean(ndcg_all))
-    ndcg_all.append(np.mean(ndcg_all))
-    print('mean RECALL@all items : ', np.mean(recall_all))
-    recall_all.append(np.mean(recall_all))
 
     print('mean RECALL@100 : ', np.mean(recall_100_list))
     mean_recall_100.append(np.mean(recall_100_list))
@@ -215,9 +203,14 @@ for epoch in range(epochs):
     print('mean RECALL@20 : ', np.mean(recall_20_list))
     mean_recall_20.append(np.mean(recall_20_list))
 
-out_dir = './figures/epo_' + str(epochs) + '_top_' + str(top_k) + '_emb_' + str(emb_dim) \
-          + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
-          # + '_loss_BCE' + '_optim_ADAM' + '_init_default/'
+out_dir = './figures/' \
+          + 'bmm/'\
+          + 'epo_' + str(epochs) + '_top_' + str(top_k) + '5_layers' \
+          + '_emb_' + str(emb_dim) \
+          + '_loss_BCE' + '_optim_RMSprop' + '_xavier_normal_/'
+          # + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
+          # + '_loss_BCE' + '_optim_RMSprop' + '_default_init_/'
+
 # out_dir = './ex/'
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
@@ -231,6 +224,7 @@ def result_plot(epochs, results, plot_label, y_label, save_name, title_label):
               'ytick.labelsize': 'xx-small'}
     plt.rcParams['figure.constrained_layout.use'] = True
     pylab.rcParams.update(params)
+    plt.figure()
     plt.plot(epochs, results, label=plot_label)
     plt.xlabel('epochs')
     plt.ylabel(y_label)
@@ -239,66 +233,51 @@ def result_plot(epochs, results, plot_label, y_label, save_name, title_label):
     plt.show()
 
 epoch_range = range(1, epochs+1)
+# print('mean_epoch_loss', mean_epoch_loss)
 result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
             plot_label='mean epoch loss', y_label='mean loss',
             save_name=out_dir + 'mean_loss.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
+                        + '_loss_BCE' + '_optim_RMS' + '_xavier_normal')
+                        # + '_loss_BCE' + '_optim_RMS' + '_kaiming_normal')
+                        # + '_loss_BCE' + '_optim_RMS' + '_default_init')
 
+# print('mean_ndcg_100', mean_ndcg_100)
 result_plot(np.array(epoch_range), np.array(mean_ndcg_100),
             plot_label='mean NDCG@100', y_label='NDCE@100',
             save_name=out_dir + 'mean_NDCE_100.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-# plt.show()
-
-result_plot(np.array(epoch_range), np.array(mean_ndcg_all),
-            plot_label='mean NDCG@all', y_label='NDCE@all',
-            save_name=out_dir + 'mean_NDCE_all.png',
-            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
-                        + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-# plt.show()
-
-result_plot(np.array(epoch_range), np.array(mean_recall_all),
-            plot_label='mean recall@all', y_label='RECALL@all',
-            save_name=out_dir + 'mean_recall_all.png',
-            title_label='epo_' + str(epochs) + '_top_' + str(top_k)
-                        + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-# plt.show()
-
+                        + '_loss_BCE' + '_optim_RMS' + '_xavier_normal')
+                        
+# print('mean_recall_100', mean_recall_100)
 result_plot(np.array(epoch_range), np.array(mean_recall_100),
             plot_label='mean recall@100', y_label='RECALL@100',
             save_name=out_dir + 'mean_recall_100.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-# plt.show()
+                        + '_loss_BCE' + '_optim_RMS' + '_xavier_normal')
 
+# print('mean_recall_50', mean_recall_50)
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
             plot_label='mean recall@50', y_label='RECALL@50',
             save_name=out_dir + 'mean_recall_50.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-# plt.show()
+                        + '_loss_BCE' + '_optim_RMS' + '_xavier_normal')
 
-result_plot(np.array(epoch_range), np.array(mean_recall_50),
+# print('mean_recall_20', mean_recall_20)
+result_plot(np.array(epoch_range), np.array(mean_recall_20),
             plot_label='mean recall@20', y_label='RECALL@20',
             save_name=out_dir + 'mean_recall_20.png',
             title_label='epo_' + str(epochs) + '_top_' + str(top_k)
                         + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_optim_RMS' + 'kaiming_normal_')
-# plt.show()
+                        + '_loss_BCE' + '_optim_RMS' + '_xavier_normal')
 
 print('\ntest started !')
-ndcg_100_list, ndcg_all, recall_all, recall_100_list, recall_50_list, recall_20_list = evaluate(test_data)
+ndcg_100_list, recall_100_list, recall_50_list, recall_20_list = evaluate(test_data)
 print('mean NDCG@100 : ', np.mean(ndcg_100_list))
-print('mean NDCG@all : ', np.mean(ndcg_all))
-print('mean RECALL@all : ', np.mean(recall_all))
 print('mean RECALL@100 : ', np.mean(recall_100_list))
 print('mean RECALL@50 : ', np.mean(recall_50_list))
 print('mean RECALL@20 : ', np.mean(recall_20_list))
