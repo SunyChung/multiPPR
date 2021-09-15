@@ -26,6 +26,24 @@ class twoway_concat(nn.Module):
 
         self.user_emb = nn.Embedding(n_users, emb_dim).to('cuda')
         self.item_emb = nn.Embedding(n_items, emb_dim).to('cuda')
+        print('\n using default weight initialization')
+
+        # print('\n kaiming_normal_ weight initialization')
+        # nn.init.kaiming_normal_(self.user_emb.weight)
+        # nn.init.kaiming_normal_(self.item_emb.weight)
+
+        # print('\nusing xavier_normal_ weight initialization')
+        # nn.init.xavier_normal_(self.user_emb.weight)
+        # nn.init.xavier_normal_(self.item_emb.weight)
+        print('\nuser_emb min : ', torch.min(self.user_emb.weight))
+        print('user_emb max : ', torch.max(self.user_emb.weight))
+        print('user_emb mean : ', torch.mean(self.user_emb.weight))
+        print('user_emb std : ', torch.std(self.user_emb.weight))
+
+        print('\nitem_emb min : ', torch.min(self.item_emb.weight))
+        print('item_emb max : ', torch.max(self.item_emb.weight))
+        print('item_emb mean : ', torch.mean(self.item_emb.weight))
+        print('item_emb std : ', torch.std(self.item_emb.weight))
 
         self.concat_net_1 = concat_linear(input_dim=multi_factor * top_k * 2,
                                           output_dim=1).to('cuda')
