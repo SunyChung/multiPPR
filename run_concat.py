@@ -197,13 +197,23 @@ print('mean RECALL@100 : ', np.mean(recall_100_list))
 print('mean RECALL@50 : ', np.mean(recall_50_list))
 print('mean RECALL@20 : ', np.mean(recall_20_list))
 
+print('\nfinal user_emb min : ', torch.min(model.user_emb.weight))
+print('final user_emb max : ', torch.max(model.user_emb.weight))
+print('final user_emb mean : ', torch.mean(model.user_emb.weight))
+print('final user_emb std : ', torch.std(model.user_emb.weight))
+
+print('\nfinal item_emb min : ', torch.min(model.item_emb.weight))
+print('final item_emb max : ', torch.max(model.item_emb.weight))
+print('final item_emb mean : ', torch.mean(model.item_emb.weight))
+print('final item_emb std : ', torch.std(model.item_emb.weight))
+
 out_dir = './figures/' \
           + 'two_concat/' \
           + 'epo_' + str(epochs) + '_top_' + str(top_k) \
           + '_emb_' + str(emb_dim) \
           + '_loss_BCE' + '_optim_RMSprop' + '_default_init_/'
-# + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
 # + '_loss_BCE' + '_optim_RMSprop' + '_xavier_normal_/'
+# + '_loss_BCE' + '_optim_RMSprop' + '_kaiming_normal_/'
 
 # out_dir = './ex/'
 if not os.path.exists(out_dir):
@@ -233,41 +243,41 @@ epoch_range = range(1, epochs + 1)
 result_plot(np.array(epoch_range), np.array(mean_epoch_loss),
             plot_label='mean epoch loss', y_label='mean loss',
             save_name=out_dir + 'mean_loss.png',
-            title_label= 'two_concat_'
+            title_label= 'two_concat'
                         + '_top_' + str(top_k) + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_opt_RMS' + '_weight_default')
+                        + '_loss_BCE' + '_opt_RMS' + '_default')
 # + '_loss_BCE' + '_opt_RMS' + '_kaiming')
-# + '_loss_BCE' + '_opt_RMS' + '_xavier')
+# + '_loss_BCE' + '_opt_RMS' + '_default')
 
 # print('mean_ndcg_100', mean_ndcg_100)
 result_plot(np.array(epoch_range), np.array(mean_ndcg_100),
             plot_label='mean NDCG@100', y_label='NDCE@100',
             save_name=out_dir + 'mean_NDCE_100.png',
-            title_label= 'two_concat_'
+            title_label= 'two_concat'
                         + '_top_' + str(top_k) + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_opt_RMS' + '_weight_default')
+                        + '_loss_BCE' + '_opt_RMS' + '_default')
 
 # print('mean_recall_100', mean_recall_100)
 result_plot(np.array(epoch_range), np.array(mean_recall_100),
             plot_label='mean recall@100', y_label='RECALL@100',
             save_name=out_dir + 'mean_recall_100.png',
-            title_label= 'two_concat_'
+            title_label= 'two_concat'
                         + '_top_' + str(top_k) + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_opt_RMS' + '_weight_default')
+                        + '_loss_BCE' + '_opt_RMS' + '_default')
 
 # print('mean_recall_50', mean_recall_50)
 result_plot(np.array(epoch_range), np.array(mean_recall_50),
             plot_label='mean recall@50', y_label='RECALL@50',
             save_name=out_dir + 'mean_recall_50.png',
-            title_label= 'two_concat_'
+            title_label= 'two_concat'
                         + '_top_' + str(top_k) + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_opt_RMS' + '_weight_default')
+                        + '_loss_BCE' + '_opt_RMS' + '_default')
 
 # print('mean_recall_20', mean_recall_20)
 result_plot(np.array(epoch_range), np.array(mean_recall_20),
             plot_label='mean recall@20', y_label='RECALL@20',
             save_name=out_dir + 'mean_recall_20.png',
-            title_label= 'two_concat_'
+            title_label= 'two_concat'
                         + '_top_' + str(top_k) + '_emb_' + str(emb_dim)
-                        + '_loss_BCE' + '_opt_RMS' + '_weight_default')
+                        + '_loss_BCE' + '_opt_RMS' + '_default')
 
