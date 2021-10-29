@@ -29,8 +29,8 @@ lr = args.learning_rate
 # lr = 1e-3
 multi_factor = args.multi_factor
 # epochs = 10
-# epochs = 50
-epochs = 100
+epochs = 50
+# epochs = 100
 # top_k = 50
 # top_k = 100
 top_k = 20
@@ -48,7 +48,8 @@ print('num of train samples : ', num_sample)
 dataset = Data(data_dir)
 train_pos, train_neg = dataset.make_train_sample_mat(num_sample)
 # train_all_mat = dataset.make_train_all_mat()
-test_mat = dataset.make_test_all_mat()
+test_pos, test_neg = dataset.make_test_sample_mat(num_sample)
+# test_mat = dataset.make_test_all_mat()
 n_users, n_items = dataset.get_num_users_items()
 
 # item feature tensor
@@ -83,7 +84,7 @@ print('optimizer : ', optimizer)
 print('loss function : ', loss)
 
 
-def train_sample(epoch, train_pos, train_neg):
+def train_sample(epoch, train_pos, train_neg, num_sample):
     print('\nepoch : ', epoch)
     model.train()
     optimizer.zero_grad()
@@ -137,15 +138,21 @@ def train_all(epoch, train_all_mat):
     return loss_list
 
 
-def evaluate_sample(test_mat):
+def evaluate_sample(test_pos, test_neg, num_sample):
     model.eval()
     ndcg_20_list, recall_20_list = [], []
 
-    for user_idx in range(test_mat.shape[0]):
-        user_row = test_mat.getrow(user_idx).toarray()[0]
-        user_idxs = np.repeat(user_idx, n_items)
+    for user_idx in range(test_pos.shape[0]):
+        pos_row = test_pos.getrow(user_idx).toarray()[0]
+        user_idxs = np.repeat(user_idx, num_sample)
+        pos_items = np.where(pos_row == 1)[0]
+        neg_row = test_neg.getrow(user_idx).toarray()[0]
+        neg_items = np.where(neg_row == -1)[0]
         item_idxs = list(range(n_items))
-        targets = user_row
+
+        item_idxs = np.concatenate((pos_items, neg_items))
+        concate_targets = np.concatenate((np.ones_like(pos_items), np.zeros_like(neg_items)))
+        targets = torch.Tensor(concate_targets)
         predictions = model(user_idxs, item_idxs)
 
         recall_20_score = RECALL(predictions, targets, k=20)
@@ -177,7 +184,7 @@ def evaluate_all(test_mat):
 # training loop
 mean_epoch_loss = []
 for epoch in range(epochs):
-    loss_list = train_sample(epoch, train_pos, train_neg)
+    loss_list = train_sample(epoch, train_pos, train_neg, num_sample)
     # loss_list = train_all(epoch, train_all_mat)
     print('mean epoch loss : ', np.mean(loss_list))
     mean_epoch_loss.append(np.mean(loss_list))
@@ -193,7 +200,8 @@ torch.save(model, os.path.join(data_dir,
 # testing
 print('\ntest started !')
 t1 = time.time()
-recall_20_list, ndcg_20_list = evaluate_all(test_mat)
+recall_20_list, ndcg_20_list = evaluate_sample(test_pos, test_neg, num_sample)
+# recall_20_list, ndcg_20_list = evaluate_all(test_mat)
 t2 = time.time()
 print('evaluation takes : ', t2 - t1)
 
