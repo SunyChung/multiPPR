@@ -10,16 +10,14 @@ import random as rd
 import scipy.sparse as sp
 import time
 import os
-import pandas as pd
+from sklearn.utils import shuffle
 
 
 class Data(object):
-    def __init__(self, path, batch_size):
+    def __init__(self, path):
         self.path = path
-        self.batch_size = batch_size
         train_file = path + '/train.txt'
         test_file = path + '/test.txt'
-
         #get number of users and items
         self.n_users, self.n_items = 0, 0
         self.n_train, self.n_test = 0, 0
@@ -52,13 +50,8 @@ class Data(object):
         self.print_statistics()
 
         self.R = sp.dok_matrix((self.n_users, self.n_items), dtype=np.float32)
-        self.R_Item = sp.dok_matrix((self.n_items, self.n_items), dtype=np.float32)
-        self.R_User = sp.dok_matrix((self.n_users, self.n_users), dtype=np.float32)
-        # building csr_matrix from loading data takes forever ...
-        # self.R = sp.csr_matrix((self.n_users, self.n_items), dtype=np.float32)
-        # self.R_Item = sp.csr_matrix((self.n_items, self.n_items), dtype=np.float32)
-        # self.R_User = sp.csr_matrix((self.n_users, self.n_users), dtype=np.float32)
-        self.train_items, self.test_set = {}, {}
+
+        self.train_set, self.test_set = {}, {}
         with open(train_file) as f_train:
             with open(test_file) as f_test:
                 for l in f_train.readlines():
@@ -68,8 +61,7 @@ class Data(object):
                     uid, train_items = items[0], items[1:]
                     for idx, i in enumerate(train_items):
                         self.R[uid, i] = 1.
-                    self.train_items[uid] = train_items
-
+                    self.train_set[uid] = train_items
                 for l in f_test.readlines():
                     if len(l) == 0: break
                     l = l.strip('\n')
@@ -80,75 +72,23 @@ class Data(object):
                     uid, test_items = items[0], items[1:]
                     self.test_set[uid] = test_items
 
-    def make_train_df(self):
-        train_dict = self.train_items
-        user_item = []
-        dic_list = list(train_dict.items())
+    def get_num_users_items(self):
+        return self.n_users, self.n_items
 
-        item_values = list(train_dict.values())
-        # 아래 for loop 순서 주의할 것 !
-        items = [j for i in range(len(item_values)) for j in item_values[i]]
-        # 근데 비교해 보니 이거 안 해도 그냥 전체 item number 그대로 임 ;
-        unique_items = list(set(items))
-
-        t1 = time.time()
-        negatives = []
-        for i in range(len(dic_list)):
-            user_idx = dic_list[i][0]
-            item_seq = dic_list[i][1]
-            neg_items = list(set(unique_items) - set(item_seq))
-            neg_sample = [rd.choice(neg_items) for _ in range(1000)]
-            neg = np.array([np.repeat(user_idx, len(neg_sample)), neg_sample]).T
-            # print('negatives shape : ', neg.shape)  # (1000, 2)
-            negatives.append(neg)
-            user_item.extend(list(zip(np.repeat(user_idx, len(item_seq)), item_seq)))
-        t2 = time.time()
-        print('takes : ', t2 - t1)
-        train_df = pd.DataFrame(user_item, columns=['userId', 'itemId'])
-        train_df['target'] = 1
-
-        train_neg_df = pd.DataFrame(np.concatenate(negatives, axis=0),
-                                    columns=['userId', 'itemId'])
-        train_neg_df['target'] = 0
-
-        merged = pd.concat([train_df, train_neg_df])
-        shuffled_df = merged.groupby('userId').sample(frac=1)
-        return shuffled_df
-
-    def make_test_df(self):
-        test_dict = self.test_set
-        user_item = []
-        dic_list = list(test_dict.items())
-        for i in range(len(dic_list)):
-            user_idx = dic_list[i][0]
-            item_seq = dic_list[i][1]
-            user_item.extend(list(zip(np.repeat(user_idx, len(item_seq)), item_seq)))
-        test_df = pd.DataFrame(user_item, columns=['userId', 'itemId'])
-        test_df['target'] = 1
-        return test_df
-
-    def save_train_df(self):
-        train_df = self.make_train_df()
-        train_df.to_csv(os.path.join(self.path, 'train.csv'), index=False)
-        print('train data saved!')
-
-    def save_test_df(self):
-        test_df = self.make_test_df()
-        test_df.to_csv(os.path.join(self.path, 'test.csv'), index=False)
-        print('test data saved!')
-
-    def load_all(self):
-        train_df = pd.read_csv(os.path.join(self.path, 'train.csv'))
-        train_np = train_df.to_numpy()
-        test_df = pd.read_csv(os.path.join(self.path, 'test.csv'))
-        test_np = test_df.to_numpy()
-        return train_np, test_np
+    def print_statistics(self):
+        print('\nusing dataset : ', self.path)
+        print('n_users= %d, n_items= %d' % (self.n_users, self.n_items))
+        print('n_interactions= %d' % (self.n_train + self.n_test))
+        print('n_train= %d, n_test= %d, sparsity= %.5f'
+              % (self.n_train, self.n_test,
+                 (self.n_train + self.n_test)/(self.n_users * self.n_items)))
 
     def get_user_item_adj(self):
         print('user_item bipartite shape : ', self.R.shape)
         return self.R.tocsr()
 
-    def project_user_item_adj(self):
+    def save_user_item_adj(self):
+         # self.R is collected only from the 'train_file' !
         bipartite = self.R.tocsr()
         start = time.time()
         user_mat = bipartite * bipartite.transpose()
@@ -161,23 +101,141 @@ class Data(object):
         return user_mat, item_mat
 
 
-    def get_num_users_items(self):
-        return self.n_users, self.n_items
+    def make_train_all_mat(self):
+        pos_indptr = [0]  # indptr
+        pos_indices = []
+        t1 = time.time()
+        for user_idx in range(len(self.train_set)):
+            item_seq = self.train_set[user_idx]
+            pos_indptr.append(pos_indptr[-1] + len(item_seq))
+            pos_indices.extend(item_seq)
+        pos_data = np.ones(len(pos_indices))
+        pos_mat = sp.csr_matrix((pos_data, pos_indices, pos_indptr),
+                                shape=(self.n_users, self.n_items))
+        t2 = time.time()
+        print('\ntrain all mat making takes : ', t2 - t1)
+        return pos_mat
 
-    def print_statistics(self):
-        print('n_users= %d, n_items= %d' % (self.n_users, self.n_items))
-        print('n_interactions= %d' % (self.n_train + self.n_test))
-        print('n_train= %d, n_test= %d, sparsity= %.5f'
-              % (self.n_train, self.n_test,
-                 (self.n_train + self.n_test)/(self.n_users * self.n_items)))
+    def make_train_sample_mat(self, num_sample):
+        pos_indptr = [0]  # indptr
+        pos_indices = []
+        neg_indptr = [0]  # indptr
+        neg_indices = []
+        t1 = time.time()
+        for user_idx in range(len(self.train_set)):
+            item_seq = self.train_set[user_idx]
+            pos_indptr.append(pos_indptr[-1] + len(item_seq))
+            pos_indices.extend(item_seq)
+
+            neg_items = list(set(range(self.n_items)) - set(item_seq))
+            num_neg = num_sample - len(item_seq)
+            neg_sample = rd.sample(neg_items, k=num_neg)
+            # SHOULDn't use random.choices()!
+            # it replaces the chosen elements
+            # thus can end up with same elements in the returned sequence !!
+            neg_indptr.append(neg_indptr[-1] + len(neg_sample))
+            neg_indices.extend(neg_sample)
+
+        pos_data = np.ones(len(pos_indices))
+        pos_mat = sp.csr_matrix((pos_data, pos_indices, pos_indptr),
+                                shape=(self.n_users, self.n_items))
+
+        neg_data = np.repeat(-1, len(neg_indices))
+        neg_mat = sp.csr_matrix((neg_data, neg_indices, neg_indptr),
+                                shape=(self.n_users, self.n_items))
+        t2 = time.time()
+        print('\ntrain batch matrix making takes : ', t2 - t1)
+        print('sample size : ', num_sample)
+
+        print('per user sequence stats ...')
+        item_seq_len = []
+        for i in range(pos_mat.shape[0]):
+            pos_sum = pos_mat.getrow(i).toarray()[0].sum()
+            item_seq_len.append(pos_sum)
+        print('max item sequence length : ', max(item_seq_len))
+        # gowalla : 811 # yelp : 1848  # amazon-book :
+        print('min item sequence length : ', min(item_seq_len))
+        # gowalla : 8  # yelp : 16   # amazon-book :
+        print('avg. item seq length : ', np.mean(item_seq_len))
+        # gowalla : 27  # yelp : 39   # amazon-book :
+        print('item seq length std : ', np.std(item_seq_len))
+        # gowalla : 36  # yelp : 45   # amazon-book :
+        return pos_mat, neg_mat
+
+
+    def make_test_all_mat(self):
+        pos_indptr = [0]
+        pos_indices = []
+        t1 = time.time()
+        for user_idx in range(len(self.test_set)):
+            item_seq = self.test_set[user_idx]
+            pos_indptr.append(pos_indptr[-1] + len(item_seq))
+            pos_indices.extend(item_seq)
+        pos_data = np.ones(len(pos_indices))
+        pos_mat = sp.csr_matrix((pos_data, pos_indices, pos_indptr),
+                                shape=(self.n_users, self.n_items))
+        t2 = time.time()
+        print('\ntest all mat making takes : ', t2 - t1)
+        return pos_mat
+
+    def load_all_mat(self):
+        train_mat = self.make_train_all_mat()
+        test_mat = self.make_test_all_mat()
+        return train_mat, test_mat
+
+
+    def make_test_sample_mat(self, num_sample):
+        pos_indptr = [0]
+        pos_indices = []
+        neg_indptr = [0]
+        neg_indices = []
+        t1 = time.time()
+        for user_idx in range(len(self.test_set)):
+            item_seq = self.test_set[user_idx]
+            pos_indptr.append(pos_indptr[-1] + len(item_seq))
+            pos_indices.extend(item_seq)
+
+            neg_items = list(set(range(self.n_items)) - set(item_seq))
+            num_neg = num_sample - len(item_seq)
+            neg_sample = rd.sample(neg_items, k=num_neg)
+            neg_indptr.append(neg_indptr[-1] + len(neg_sample))
+            neg_indices.extend(neg_sample)
+
+        pos_data = np.ones(len(pos_indices))
+        pos_mat = sp.csr_matrix((pos_data, pos_indices, pos_indptr),
+                                shape=(self.n_users, self.n_items))
+        
+        neg_data = np.repeat(-1, len(neg_indices))
+        neg_mat = sp.csr_matrix((neg_data, neg_indices, neg_indptr),
+                                shape=(self.n_users, self.n_items))
+        t2 = time.time()
+        print('\ntest batch matrix making takes : ', t2 - t1)
+        print('sample size : ', num_sample)
+        return pos_mat, neg_mat
+
+
+    def make_test_sample(self, num_sample):
+        train_value_list = list(self.train_set.values())
+        train_item_list = [item for i in range(len(train_value_list)) for item in train_value_list[i]]
+        train_item_set = set(train_item_list)
+        train_items = list(train_item_set)
+
+        test_value_list = list(self.test_set.values())
+        test_item_list = [item for i in range(len(test_value_list)) for item in test_value_list[i]]
+        test_item_set = set(test_item_list)
+        test_items = list(test_item_set)
+
 
 
 if __name__ == '__main__':
-    path = './data/gowalla'
-    batch_size = 500
+    # path = './data/gowalla'
+    path = './data/yelp2018'
+    # path = './data/amazon-book'
 
-    data = Data(path, batch_size)
-    # user_mat, item_mat = data.project_user_item_adj()
-    train_df = data.make_train_df()
-    data.save_train_df()
-    data.save_test_df()
+    data = Data(path)
+    user_mat, item_mat = data.save_user_item_adj()
+    # train_df = data.make_train_df()
+    # test_df = data.make_test_df()
+    # num_sample = 3000
+    # data.save_train_df(num_sample)
+    # data.save_test_df(num_sample)
