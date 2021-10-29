@@ -192,7 +192,8 @@ for epoch in range(epochs):
 torch.save(model, os.path.join(data_dir,
                                'top_k_' + str(top_k)
                                + '_emb_' + str(emb_dim)
-                               + '_train_sam_' + str(num_sample)
+                               + '_num_sam_' + str(num_sample)
+                               # + '_train_sam_' + str(num_sample)
                                # + '_test_sam_' + str(test_batch_size)
                                + '_epoch_' + str(epochs)
                                + '.model'))
