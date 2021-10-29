@@ -3,131 +3,80 @@ import pickle
 import time
 import numpy as np
 import torch
+import scipy.sparse as sp
 from sknetwork.ranking import PageRank
-
-from utils import get_movie_matrix, get_user_matrix
-
-
-class PPRfeatures(object):
-    def __init__(self, top_k, idx_dict, ppr_dict):
-        self.idx_values = np.array(list(idx_dict.values()))[:, :, :top_k]
-        # print('idx_values shape : ', self.idx_values.shape)  # (3515, 5, 50)
-        self.ppr_scores = np.array(list(ppr_dict.values()))[:, :, :top_k]
-
-    def reshaped_idx_tensor(self):
-        reshaped = self.idx_values.reshape(self.idx_values.shape[0], -1)
-        idx_tensor = torch.LongTensor(reshaped)
-        # print('idx_tensor shape : ', idx_tensor.shape)  # torch.Size([3515, 250])
-        # idx_tensor = torch.LongTensor(self.idx_values)
-        # [# items/users, multi-factors, top_k]
-        return idx_tensor
-
-    def reshaped_scr_tensor(self):
-        reshaped = self.ppr_scores.reshape(self.ppr_scores.shape[0], -1)
-        scr_tensor = torch.FloatTensor(reshaped)
-        # print('scr_tensor shape : ', scr_tensor.shape)  # torch.Size([3515, 250])
-        # scr_tensor = torch.LongTensor(self.ppr_scores)
-        # [# items/users, multi-factors, top_k]
-        return scr_tensor
+from collections import defaultdict
 
 
-'''
-if __name__ == '__main__':
-    data_dir = './data/ml-1m'
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    top_k = 20
+class get_ppr(object):
+    def __init__(self, top_k, dict):
+        self.array_idxs = np.array(list(dict.values()))[:, :, :top_k]
 
-    # item context tensor
-    with open(os.path.join(data_dir, 'per_item_idx.dict'), 'rb') as f:
-        item_idx_dict = pickle.load(f)
-    with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'rb') as f:
-        item_ppr_dict = pickle.load(f)
-    pf = PPRfeatures(top_k, item_idx_dict, item_ppr_dict)
-    item_idx_tensor = pf.idx_tensor()
-    item_scr_tensor = pf.scr_tensor()
-    del item_idx_dict
-    del item_ppr_dict
+    def reshaped_tensor(self):
+        reshaped = self.array_idxs.reshape(self.array_idxs.shape[0], -1)
+        return torch.LongTensor(reshaped)
 
-    # user context tensor
-    with open(os.path.join(data_dir, 'per_user_idx.dict'), 'rb') as f:
-        user_idx_dict = pickle.load(f)
-    with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'rb') as f:
-        user_ppr_dict = pickle.load(f)
-    pf = PPRfeatures(top_k, user_idx_dict, user_ppr_dict)
-    user_idx_tensor = pf.idx_tensor()
-    user_scr_tensor = pf.scr_tensor()
-    del user_idx_dict
-    del user_ppr_dict
-'''
-
-
-class MultiPPR(object):
-    def __init__(self, damping_factors, matrix):
-        super(MultiPPR, self).__init__()
+class multi_PPR(object):
+    def __init__(self, mat, damping_factors):
+        self.mat = mat
+        self.base_zeros = np.zeros(mat.shape[0] - 1)
         self.damping_factors = damping_factors
-        self.mat = matrix
+        self.per_user_idx_dict = defaultdict(dict)
 
-    def multi_context(self, target_idx):
-        base_zeros = np.zeros(self.mat.shape[0] - 1)
-        seed = np.insert(base_zeros, target_idx, 1)
-        multi_score = []
-        indices = []
+    def calculate(self):
+        start = time.time()
         for i in range(len(self.damping_factors)):
-            pagerank = PageRank(damping_factor=self.damping_factors[i])
-            ppr = pagerank.fit_transform(self.mat.toarray(), seeds=seed)
-            idx = np.argsort(ppr)[::-1]
-            sorted_scroes = ppr[idx]
-            multi_score.append(np.array(sorted_scroes))
-            indices.append(np.array(idx))
-        return np.array(multi_score), np.array(indices)
+            pagerank = PageRank(damping_factor=damping_factors[i], n_iter=5)
+            for j in range(self.mat.shape[0]):
+                seed = np.insert(self.base_zeros, j, 1)
+                ppr = pagerank.fit_transform(self.mat.toarray(), seeds=seed)
+                idx = np.argsort(ppr)[::-1]
+                per_user_idx_dict[j][damping_factors[i]] = idx
+                if j % 1000 == 0:
+                    print('%d nodes processed!' % j)
+                    print('upto now %f S passed' % (time.time() - start))
+        end = time.time()
+        print('multi-ppr processing takes : ', end - start)
 
 
 if __name__ == '__main__':
-    data_dir = './data/ml-1m'
-    # data_dir = './data/ml-20m'
+    data_dir = './data/gowalla'
     damping_factors = [0.30, 0.50, 0.75, 0.85, 0.95]
 
-    # item feature extraction
-    movie_mat = get_movie_matrix(data_dir)
-    print('movie_mat shape : ', movie_mat.shape)
-    multi_ppr = MultiPPR(damping_factors, movie_mat)
-    start = time.time()
-    per_item_ppr_dict = {}
-    per_item_idx_dict = {}
-    for i in range(movie_mat.shape[0]):
-        scores, indices = multi_ppr.multi_context(i)
-        per_item_ppr_dict[i] = scores
-        per_item_idx_dict[i] = indices
-        if i % 100 == 0:  # for ml-1m
-        # if i % 10 == 0:  # for ml-20m
-            print('%d nodes processed!' % i)
-            print('upto now %f S passed' % (time.time() - start))
-    end = time.time()
-    print('multi-ppr processing takes : ', end - start)
-    with open(os.path.join(data_dir, 'per_item_ppr.dict'), 'wb') as f:
-        pickle.dump(per_item_ppr_dict, f)
-    with open(os.path.join(data_dir, 'per_item_idx.dict'), 'wb') as f:
-        pickle.dump(per_item_idx_dict, f)
-
-    # user feature extraction
-    user_mat = get_user_matrix(data_dir)
+    # user feature extraction : 29858
+    user_mat = sp.load_npz(data_dir + '/user_mat.npz')
     print('user_mat shape : ', user_mat.shape)
-    multi_ppr = MultiPPR(damping_factors, user_mat)
+    per_user_idx_dict = defaultdict(dict)
+    base_zeros = np.zeros(user_mat.shape[0] - 1)
     start = time.time()
-    per_user_ppr_dict = {}
-    per_user_idx_dict = {}
-    for i in range(user_mat.shape[0]):
-        scores, indices = multi_ppr.multi_context(i)
-        per_user_ppr_dict[i] = scores
-        per_user_idx_dict[i] = indices
-        if i % 100 == 0:
-        # if i % 10 == 0:  # for ml-20m
-            print('%d nodes processed!' % i)
-            print('upto now %f S passed' % (time.time() - start))
+    for i in range(len(damping_factors)):
+        pagerank = PageRank(damping_factor=damping_factors[i], n_iter=5)
+        for j in range(user_mat.shape[0]):
+            seed = np.insert(base_zeros, j, 1)
+            ppr = pagerank.fit_transform(user_mat.toarray(), seeds=seed)
+            idx = np.argsort(ppr)[::-1]
+            per_user_idx_dict[j][damping_factors[i]] = idx
+            if j % 1000 == 0:
+                print('%d nodes processed!' % j)
+                print('upto now %f S passed' % (time.time() - start))
     end = time.time()
     print('multi-ppr processing takes : ', end - start)
-    with open(os.path.join(data_dir, 'per_user_ppr.dict'), 'wb') as f:
-        pickle.dump(per_user_ppr_dict, f)
-    with open(os.path.join(data_dir, 'per_user_idx.dict'), 'wb') as f:
+    with open(os.path.join(data_dir, '/per_user_idx.dict'), 'wb') as f:
         pickle.dump(per_user_idx_dict, f)
+
+    # item feature extraction : 40981
+    # item_mat = sp.load_npz(data_dir + '/item_mat.npz')
+    # print('movie_mat shape : ', item_mat.shape)
+    # multi_ppr = MultiPPR(damping_factors, item_mat)
+    # start = time.time()
+    # per_item_idx_dict = {}
+    # for i in range(item_mat.shape[0]):
+    #     indices = multi_ppr.multi_context(i)
+    #     per_item_idx_dict[i] = indices
+    #     if i % 1000 == 0:
+    #         print('%d nodes processed!' % i)
+    #         print('upto now %f S passed' % (time.time() - start))
+    # end = time.time()
+    # print('multi-ppr processing takes : ', end - start)
+    # with open(os.path.join(data_dir, '/per_item_idx.dict'), 'wb') as f:
+    #     pickle.dump(per_item_idx_dict, f)
