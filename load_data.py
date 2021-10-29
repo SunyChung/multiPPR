@@ -147,7 +147,7 @@ class Data(object):
         print('\ntrain batch matrix making takes : ', t2 - t1)
         print('sample size : ', num_sample)
 
-        print('per user sequence stats ...')
+        print('\nper user sequence stats ...')
         item_seq_len = []
         for i in range(pos_mat.shape[0]):
             pos_sum = pos_mat.getrow(i).toarray()[0].sum()
@@ -161,27 +161,6 @@ class Data(object):
         print('item seq length std : ', np.std(item_seq_len))
         # gowalla : 36  # yelp : 45   # amazon-book :
         return pos_mat, neg_mat
-
-
-    def make_test_all_mat(self):
-        pos_indptr = [0]
-        pos_indices = []
-        t1 = time.time()
-        for user_idx in range(len(self.test_set)):
-            item_seq = self.test_set[user_idx]
-            pos_indptr.append(pos_indptr[-1] + len(item_seq))
-            pos_indices.extend(item_seq)
-        pos_data = np.ones(len(pos_indices))
-        pos_mat = sp.csr_matrix((pos_data, pos_indices, pos_indptr),
-                                shape=(self.n_users, self.n_items))
-        t2 = time.time()
-        print('\ntest all mat making takes : ', t2 - t1)
-        return pos_mat
-
-    def load_all_mat(self):
-        train_mat = self.make_train_all_mat()
-        test_mat = self.make_test_all_mat()
-        return train_mat, test_mat
 
 
     def make_test_sample_mat(self, num_sample):
@@ -212,6 +191,27 @@ class Data(object):
         print('\ntest batch matrix making takes : ', t2 - t1)
         print('sample size : ', num_sample)
         return pos_mat, neg_mat
+
+
+    def make_test_all_mat(self):
+        pos_indptr = [0]
+        pos_indices = []
+        t1 = time.time()
+        for user_idx in range(len(self.test_set)):
+            item_seq = self.test_set[user_idx]
+            pos_indptr.append(pos_indptr[-1] + len(item_seq))
+            pos_indices.extend(item_seq)
+        pos_data = np.ones(len(pos_indices))
+        pos_mat = sp.csr_matrix((pos_data, pos_indices, pos_indptr),
+                                shape=(self.n_users, self.n_items))
+        t2 = time.time()
+        print('\ntest all mat making takes : ', t2 - t1)
+        return pos_mat
+
+    def load_all_mat(self):
+        train_mat = self.make_train_all_mat()
+        test_mat = self.make_test_all_mat()
+        return train_mat, test_mat
 
 
     def make_test_sample(self, num_sample):
