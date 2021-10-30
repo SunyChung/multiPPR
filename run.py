@@ -9,7 +9,7 @@ import torch.optim as optim
 
 from features import get_ppr
 from load_data import Data
-from utils import RECALL, NDCG
+from utils import *
 
 from oneway_concat_model import oneway_concat
 
@@ -142,24 +142,29 @@ def evaluate_sample(test_pos, test_neg, num_sample):
     model.eval()
     ndcg_20_list, recall_20_list = [], []
 
+    t1 = time.time()
     for user_idx in range(test_pos.shape[0]):
         pos_row = test_pos.getrow(user_idx).toarray()[0]
         user_idxs = np.repeat(user_idx, num_sample)
         pos_items = np.where(pos_row == 1)[0]
         neg_row = test_neg.getrow(user_idx).toarray()[0]
         neg_items = np.where(neg_row == -1)[0]
-        item_idxs = list(range(n_items))
 
         item_idxs = np.concatenate((pos_items, neg_items))
-        concate_targets = np.concatenate((np.ones_like(pos_items), np.zeros_like(neg_items)))
-        targets = torch.Tensor(concate_targets)
+        # concate_targets = np.concatenate((np.ones_like(pos_items), np.zeros_like(neg_items)))
+        # targets = torch.Tensor(concate_targets)
+        # targets = torch.Tensor(np.ones_like(pos_items))
         predictions = model(user_idxs, item_idxs)
 
-        recall_20_score = RECALL(predictions, targets, k=20)
+        recall_20_score = RECALL(predictions, pos_items, k=20)
         recall_20_list.append(recall_20_score)
 
-        ndcg_20_score = NDCG(predictions, targets, k=20)
+        ndcg_20_score = NDCG(predictions, pos_items, k=20)
         ndcg_20_list.append(ndcg_20_score)
+        if user_idx % 1000 == 0:
+            print('up to user no. ' + str(user_idx) + ' processed!')
+            t2 = time.time()
+            print('takes : ', t2 - t1)
     return recall_20_list, ndcg_20_list
 
 
@@ -167,6 +172,7 @@ def evaluate_all(test_mat):
     model.eval()
     ndcg_20_list, recall_20_list = [], []
 
+    t1 = time.time()
     for user_idx in range(test_mat.shape[0]):
         user_row = test_mat.getrow(user_idx).toarray()[0]
         user_idxs = np.repeat(user_idx, n_items)
@@ -174,11 +180,15 @@ def evaluate_all(test_mat):
         targets = user_row
         predictions = model(user_idxs, item_idxs)
 
-        recall_20_score = RECALL(predictions, targets, k=20)
+        recall_20_score = RECALL_all(predictions, targets, k=20)
         recall_20_list.append(recall_20_score)
 
-        ndcg_20_score = NDCG(predictions, targets, k=20)
+        ndcg_20_score = NDCG_all(predictions, targets, k=20)
         ndcg_20_list.append(ndcg_20_score)
+        if user_idx % 1000 == 0:
+            print('up to user no. ' + str(user_idx) + ' processed!')
+            t2 = time.time()
+            print('takes : ', t2 - t1)
     return recall_20_list, ndcg_20_list
 
 # training loop
