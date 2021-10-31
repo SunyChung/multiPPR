@@ -4,37 +4,25 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 
 
-def RECALL(predictions, target_ids, k):
+def RECALL(predictions, targets, k):
     topk_idx = torch.argsort(predictions, descending=True)[:k]\
                 .detach().to('cpu').numpy()
-    tmp = len(set(topk_idx) & set(target_ids))
-    dinorm = min(k, len(target_ids))
+    predictions = predictions.detach().to('cpu').numpy()
+    tmp = predictions[topk_idx].sum()
+    # dinorm = min(k, targets.sum())
+    # or should be like below? : 이게 맞는 거 같음
+    # 더 값이 크게 나올 수도, 이걸로도 test 해야 함!!
+    # min() 은 아닌거 같음 ...;
+    dinorm = targets.sum()
     return tmp / dinorm
 
-def NDCG(predictions, target_ids, k):
+def NDCG(predictions, targets, k):
     topk_idx = torch.argsort(predictions, descending=True)[:k]\
                 .detach().to('cpu').numpy()
     discount = 1. / np.log2(np.arange(2, k+2))
     predictions = predictions.detach().to('cpu').numpy()
     DCG = np.array(predictions[topk_idx] * discount).sum()
-    IDCG = discount[:min(len(target_ids), k)].sum()
-    return DCG / IDCG
-
-
-def RECALL_all(predictions, targets, k):
-    topk_idx = torch.argsort(predictions, descending=True)[:k]\
-                .detach().to('cpu').numpy()
-    target_ids = np.where(targets == 1)[0]
-    tmp = len(set(topk_idx) & set(target_ids))
-    dinorm = min(k, targets.sum())
-    return tmp / dinorm
-
-def NDCG_all(predictions, targets, k):
-    topk_idx = torch.argsort(predictions, descending=True)[:k]\
-                .detach().to('cpu').numpy()
-    discount = 1. / np.log2(np.arange(2, k+2))
-    DCG = np.array(targets[topk_idx] * discount).sum()
-    IDCG = discount[:min(targets.sum(dtype=np.int32), k)].sum()
+    IDCG = discount[:min(k, targets.sum())].sum()
     return DCG / IDCG
 
 
