@@ -25,12 +25,13 @@ top_k = 20
 num_sample = 10000
 
 print('verification ...')
-print('num of train samples : ', num_sample)
-
 dataset = Data(data_dir)
-# test_mat = dataset.make_test_all_mat()
+print('testing all items ...')
+test_mat = dataset.make_test_all_mat()
 n_users, n_items = dataset.get_num_users_items()
-test_pos, test_neg = dataset.make_test_sample_mat(num_sample)
+
+# print('num of train samples : ', num_sample)
+# test_pos, test_neg = dataset.make_test_sample_mat(num_sample)
 
 # item feature tensor
 with open(os.path.join(data_dir, 'per_item_idx.dict'), 'rb') as f:
@@ -50,7 +51,7 @@ del user_idx_dict
 print('CPU loading ...')
 device = torch.device('cpu')
 model = torch.load(os.path.join(data_dir,
-    'top_k_20_emb_64_num_sam_10000_epoch_50.model')
+    'top_k_20_emb_64_train_sam_10000_epoch_50.model')
     , map_location=device)
 # model = torch.load(
 #     'top_k_20_emb_32_epoch_50.model', map_location=device)
@@ -58,10 +59,11 @@ print(model)
 
 # nohup_yelp_train_5000_test_all_emb_32_top_20_epoch_50
 # top_k_20_emb_32_epoch_50.model
-
 print('testing the saved model ... ')
+
 def evaluate_sample(test_pos, test_neg, num_sample):
     model.eval()
+    print('sample testing ...')
     ndcg_20_list, recall_20_list = [], []
     t1 = time.time()
     for user_idx in range(test_pos.shape[0]):
@@ -91,6 +93,7 @@ def evaluate_sample(test_pos, test_neg, num_sample):
 
 def evaluate_all(test_mat):
     model.eval()
+    print('all items testing ...')
     ndcg_20_list, recall_20_list = [], []
 
     t1 = time.time()
@@ -113,8 +116,8 @@ def evaluate_all(test_mat):
     return recall_20_list, ndcg_20_list
 
 
-recall_20_list, ndcg_20_list = evaluate_sample(test_pos, test_neg, num_sample)
-# recall_20_list, ndcg_20_list = evaluate_all(test_mat)
+# recall_20_list, ndcg_20_list = evaluate_sample(test_pos, test_neg, num_sample)
+recall_20_list, ndcg_20_list = evaluate_all(test_mat)
 
 
 print('mean recall@20 : ', np.mean(recall_20_list))
