@@ -104,10 +104,10 @@ def evaluate_all(test_mat):
         targets = user_row
         predictions = model(user_idxs, item_idxs)
 
-        recall_20_score = RECALL_all(predictions, targets, k=20)
+        recall_20_score = RECALL(predictions, targets, k=20)
         recall_20_list.append(recall_20_score)
 
-        ndcg_20_score = NDCG_all(predictions, targets, k=20)
+        ndcg_20_score = NDCG(predictions, targets, k=20)
         ndcg_20_list.append(ndcg_20_score)
         if user_idx % 1000 == 0:
             print('up to user no. ' + str(user_idx) + ' processed!')
