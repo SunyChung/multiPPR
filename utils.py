@@ -22,7 +22,7 @@ def NDCG(predictions, targets, k):
     discount = 1. / np.log2(np.arange(2, k+2))
     predictions = predictions.detach().to('cpu').numpy()
     DCG = np.array(predictions[topk_idx] * discount).sum()
-    IDCG = discount[:min(k, targets.sum())].sum()
+    IDCG = discount[:min(k, targets.sum(dtype=np.int32))].sum()
     return DCG / IDCG
 
 
