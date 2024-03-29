@@ -1,4 +1,4 @@
-Multiple Personalized PageRank (multiPPR) exploits the multiple extractions of personalized PageRank (PPR) for link prediction.
+Multiple Personalized PageRank (multiPPR) exploits the multiple extractions of personalized PageRank (PPR) for recommendation.
 - assumption : users select items with one intention among multiple intentions
 - use the multiple context information (PPR) for the intention inference
 
