@@ -9,10 +9,6 @@ def RECALL(predictions, targets, k):
                 .detach().to('cpu').numpy()
     predictions = predictions.detach().to('cpu').numpy()
     tmp = predictions[topk_idx].sum()
-    # dinorm = min(k, targets.sum())
-    # or should be like below? : 이게 맞는 거 같음
-    # 더 값이 크게 나올 수도, 이걸로도 test 해야 함!!
-    # min() 은 아닌거 같음 ...;
     dinorm = targets.sum()
     return tmp / dinorm
 
